@@ -3,7 +3,6 @@ mod commands;
 mod seller;
 
 use seller::SellerState;
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 
@@ -12,6 +11,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(
             #[cfg(target_os = "macos")]
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -21,46 +21,50 @@ pub fn run() {
         ))
         .manage(SellerState::new())
         .setup(|app| {
-            // ---- Tray icon + menu ----
-            let show_hide = MenuItemBuilder::with_id("show_hide", "Show/Hide")
-                .build(app)
-                .expect("failed to create Show/Hide menu item");
-            let quit = MenuItemBuilder::with_id("quit", "Quit")
-                .build(app)
-                .expect("failed to create Quit menu item");
-            let menu = MenuBuilder::new(app)
-                .item(&show_hide)
-                .item(&quit)
-                .build()
-                .expect("failed to build tray menu");
+            use std::sync::atomic::{AtomicBool, Ordering};
+            use std::sync::Arc;
 
+            // Hide from dock on macOS
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            let window_visible = Arc::new(AtomicBool::new(false));
+
+            // ---- Tray icon: toggle window on click ----
+            let vis = window_visible.clone();
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
-                .on_menu_event(|app, event| match event.id().as_ref() {
-                    "show_hide" => {
+                .show_menu_on_left_click(false)
+                .on_tray_icon_event(move |tray, event| {
+                    // Keep positioner plugin in sync with tray position
+                    let app = tray.app_handle();
+                    tauri_plugin_positioner::on_tray_event(app, &event);
+                    if let tauri::tray::TrayIconEvent::Click { button_state, .. } = event {
+                        if button_state != tauri::tray::MouseButtonState::Up {
+                            return;
+                        }
                         if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
+                            if vis.fetch_xor(true, Ordering::SeqCst) {
                                 let _ = window.hide();
                             } else {
+                                use tauri_plugin_positioner::{Position, WindowExt};
+                                let _ = window.move_window(Position::TrayBottomCenter);
                                 let _ = window.show();
                                 let _ = window.set_focus();
                             }
                         }
                     }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
                 })
                 .build(app)
                 .expect("failed to build tray icon");
 
             // Hide instead of close — so closing the window sends it to tray
             if let Some(window) = app.get_webview_window("main") {
+                let vis = window_visible.clone();
                 let w = window.clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        vis.store(false, Ordering::SeqCst);
                         let _ = w.hide();
                         api.prevent_close();
                     }

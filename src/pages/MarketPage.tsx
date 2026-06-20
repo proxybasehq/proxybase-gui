@@ -112,21 +112,20 @@ export default function MarketPage() {
           border: "1px solid #f5a623",
           background: "#fffbeb",
           textAlign: "center",
-          marginBottom: "var(--space-md)",
+          marginBottom: "var(--space-sm)",
         }}>
-          <div style={{ fontSize: 40, marginBottom: "var(--space-sm)" }}>&#x26A0;</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: "var(--color-ink)", marginBottom: "var(--space-xs)" }}>
+          <div style={{ fontSize: 28, marginBottom: "var(--space-xs)", lineHeight: 1 }}>{'⚠'}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-ink)", marginBottom: 4 }}>
             Insufficient Balance
           </div>
-          <p style={{ fontSize: 14, color: "var(--color-body)", margin: "0 0 var(--space-lg) 0", lineHeight: 1.6 }}>
-            You don't have enough funds to purchase this session.
-            Deposit crypto into your wallet to continue.
+          <p style={{ fontSize: 13, color: "var(--color-body)", margin: "0 0 var(--space-sm) 0", lineHeight: 1.5 }}>
+            You don't have enough funds. Deposit crypto to continue.
           </p>
           <div style={{ display: "flex", gap: "var(--space-sm)", justifyContent: "center" }}>
-            <button className="btn btn-success" onClick={() => { setInsufficientFunds(false); openDeposit(); }}>
+            <button className="btn btn-success btn-sm" onClick={() => { setInsufficientFunds(false); openDeposit(); }}>
               Deposit Funds
             </button>
-            <button className="btn btn-secondary" onClick={() => setInsufficientFunds(false)}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setInsufficientFunds(false)}>
               Dismiss
             </button>
           </div>
@@ -137,8 +136,7 @@ export default function MarketPage() {
       {connectModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => setConnectModal(null)}>
-          <div style={{ background: "var(--color-canvas)", borderRadius: "var(--rounded-md)", padding: "var(--space-xl)", maxWidth: 480, width: "90%", boxShadow: "var(--shadow-card)" }}
-            onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="card-title">Proxy Connection Details</div>
             <table style={{ marginTop: "var(--space-sm)" }}>
               <tbody>
@@ -166,7 +164,7 @@ export default function MarketPage() {
           {availablePrices.length > 0 ? (
             <div className="table-container" style={{ marginTop: "var(--space-sm)" }}>
               <table>
-                <thead><tr><th>Country</th><th>Category</th><th>Buyer Price</th><th>Seller Credit</th><th style={{ width: 120 }}></th></tr></thead>
+                <thead><tr><th>Country</th><th>Category</th><th>Price</th><th style={{ width: 80 }}></th></tr></thead>
                 <tbody>
                   {availablePrices.map((p, i) => {
                     const c = (p as any).country as string;
@@ -178,11 +176,10 @@ export default function MarketPage() {
                       <td>{countryFlag(c)} {countryName(c)}</td>
                       <td><span className="badge">{nt}</span></td>
                       <td className="font-mono">{formatUsdPerGb((p as any).buyer_price_microcredits_per_gb)}</td>
-                      <td className="font-mono">{formatUsdPerGb((p as any).seller_credit_microcredits_per_gb)}</td>
                       <td>
                         <button
                           className="btn btn-success"
-                          style={{ padding: "0 16px", height: 36, fontSize: 14, fontWeight: 600, width: "100%" }}
+                          style={{ padding: "0 12px", height: 26, fontSize: 12, fontWeight: 600, width: "100%" }}
                           onClick={() => handleBuyFromPrice(c, nt)}
                           disabled={loading}
                         >

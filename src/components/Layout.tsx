@@ -12,16 +12,14 @@ import {
   stopSeller as apiStopSeller,
   listSessions,
   closeSession,
-  getBalance,
   createDeposit,
-  getDeposit,
   listCurrencies,
 } from "../api";
-import { formatUsd } from "../utils";
 import { listen } from "@tauri-apps/api/event";
 import { load } from "@tauri-apps/plugin-store";
 import { enable } from "@tauri-apps/plugin-autostart";
 import QRCode from "qrcode";
+import { setPendingDeposit } from "../pages/DepositPage";
 
 export interface SellerState {
   running: boolean;
@@ -37,10 +35,10 @@ export interface AppContext {
   startSeller: (backendUrl: string, upstreams: UpstreamProxy[], includeDirect: boolean) => Promise<void>;
   stopSeller: () => Promise<void>;
   openDeposit: () => void;
+  handleLogout: () => Promise<void>;
+  walletAddr: string;
+  walletLoaded: boolean;
 }
-
-const DEPOSIT_TIMEOUT_SECS = 9 * 60; // 9 minutes
-const POLL_INTERVAL_MS = 10_000;
 
 export default function Layout() {
   const { backendUrl } = useBackend();
@@ -48,26 +46,16 @@ export default function Layout() {
   const [walletAddr, setWalletAddr] = useState("");
   const [walletLoaded, setWalletLoaded] = useState(false);
   const [isAuth, setIsAuth] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
-  const [showBalance, setShowBalance] = useState(false);
-  const [balance, setBalance] = useState<Record<string, unknown> | null>(null);
-  const [balanceLoading, setBalanceLoading] = useState(false);
   const didAutoLogin = useRef(false);
 
   // ---- Deposit modal state ----
   const [showDeposit, setShowDeposit] = useState(false);
-  const [depositStep, setDepositStep] = useState<"form" | "created" | "completed" | "expired">("form");
   const [depError, setDepError] = useState("");
   const [depLoading, setDepLoading] = useState(false);
   const [depPreset, setDepPreset] = useState<number | "other">(10);
   const [depCustomAmount, setDepCustomAmount] = useState("");
   const [depCurrency, setDepCurrency] = useState("usdcsol");
   const [currencies, setCurrencies] = useState<string[]>(["usdcsol"]);
-  const [depResult, setDepResult] = useState<Record<string, unknown> | null>(null);
-  const [qrDataUrl, setQrDataUrl] = useState("");
-  const [countdown, setCountdown] = useState(DEPOSIT_TIMEOUT_SECS);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const PRESETS = [10, 20, 100] as const;
 
@@ -79,27 +67,16 @@ export default function Layout() {
     return depPreset;
   }
 
-  function clearDepositTimers() {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-  }
-
   function closeDeposit() {
-    clearDepositTimers();
     setShowDeposit(false);
-    setDepositStep("form");
     setDepError("");
-    setDepResult(null);
-    setQrDataUrl("");
     setDepPreset(10);
     setDepCustomAmount("");
-    setCountdown(DEPOSIT_TIMEOUT_SECS);
   }
 
   // Load currencies when deposit modal opens
   async function openDeposit() {
     setShowDeposit(true);
-    setDepositStep("form");
     try {
       const r = await listCurrencies(backendUrl);
       const arr = (r as any).currencies || [];
@@ -114,17 +91,24 @@ export default function Layout() {
     setDepLoading(true);
     try {
       const r = await createDeposit(backendUrl, Math.round(amount * 1_000_000), depCurrency);
-      setDepResult(r);
-      setDepositStep("created");
-      // Generate QR code
       const addr = (r as any).pay_address || "";
+      let qrDataUrl = "";
       if (addr) {
-        const qr = await QRCode.toDataURL(addr, { width: 200, margin: 1 });
-        setQrDataUrl(qr);
+        qrDataUrl = await QRCode.toDataURL(addr, { width: 200, margin: 1 });
       }
-      // Start countdown
-      setCountdown(DEPOSIT_TIMEOUT_SECS);
-      startCountdownAndPoll((r as any).deposit_id);
+      // Close modal and navigate to dedicated deposit page
+      setPendingDeposit({
+        deposit_id: (r as any).deposit_id,
+        pay_address: addr,
+        pay_currency: (r as any).pay_currency,
+        pay_amount: (r as any).pay_amount,
+        amount_microcredits: Math.round(amount * 1_000_000),
+        qrDataUrl,
+      });
+      setShowDeposit(false);
+      setDepPreset(10);
+      setDepCustomAmount("");
+      navigate("/deposit");
     } catch (e) {
       const msg = String(e);
       if (msg.toLowerCase().includes("too small")) {
@@ -134,39 +118,6 @@ export default function Layout() {
       }
     }
     setDepLoading(false);
-  }
-
-  function startCountdownAndPoll(depositId: string) {
-    // Countdown timer
-    timerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearDepositTimers();
-          setDepositStep("expired");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    // Poll deposit status
-    pollRef.current = setInterval(async () => {
-      try {
-        const status = await getDeposit(backendUrl, depositId);
-        const s = (status as any).status || "";
-        if (s === "paid" || s === "completed" || s === "confirming") {
-          clearDepositTimers();
-          setDepResult(status);
-          setDepositStep("completed");
-        }
-      } catch (_) { /* ignore poll errors */ }
-    }, POLL_INTERVAL_MS);
-  }
-
-  function formatCountdown(secs: number) {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
   }
 
   // ---- Seller background state ----
@@ -268,39 +219,12 @@ export default function Layout() {
     navigate("/wallet");
   }
 
-  async function handleShowBalance() {
-    setShowBalance(true); setBalanceLoading(true);
-    try { setBalance(await getBalance(backendUrl)); } catch (_) { setBalance(null); }
-    setBalanceLoading(false);
-  }
-
   function handleLoginSuccess() { setIsAuth(true); navigate("/market"); }
-
-  function renderBalanceRows(data: Record<string, unknown>) {
-    const mcFields: [string, string][] = [
-      ["spendable_balance", "Spendable"], ["buyer_available", "Buyer Available"],
-      ["buyer_reserved", "Buyer Reserved"], ["buyer_spent", "Buyer Spent"],
-      ["seller_pending", "Seller Pending"], ["seller_available", "Seller Available"],
-      ["seller_payout_locked", "Payout Locked"],
-    ];
-    return (
-      <table><tbody>
-        {mcFields.map(([key, label]) => {
-          const val = data[key];
-          if (val === undefined || val === null) return null;
-          return (<tr key={key}>
-            <td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{label}</td>
-            <td className="font-mono" style={{ fontSize: 13, textAlign: "right" }}>{formatUsd(val as number)}</td>
-          </tr>);
-        })}
-      </tbody></table>
-    );
-  }
 
   const context: AppContext = {
     onLoginSuccess: handleLoginSuccess, isAuthenticated: isAuth, seller,
     startSeller: handleStartSeller, stopSeller: handleStopSeller,
-    openDeposit,
+    openDeposit, handleLogout, walletAddr, walletLoaded,
   };
 
   return (
@@ -319,206 +243,72 @@ export default function Layout() {
           </a>
         </span>
         <div className="app-header-status">
-          {sellerConnected && sellerStreams.length > 0 && (
-            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "#22c55e" }}>
-              SELLER · {sellerStreams.length} streams
-            </span>
-          )}
-          {walletLoaded && (
-            <span className="app-header-addr">{walletAddr.slice(0, 10)}...{walletAddr.slice(-6)}</span>
-          )}
-          <span className={`status-dot ${isAuth ? "status-dot-connected" : "status-dot-disconnected"}`} />
-          {isAuth && (
-            <span style={{ cursor: "pointer", display: "flex", alignItems: "center", marginLeft: 4, fontWeight: 700, fontSize: 15, color: "#22c55e" }}
-              onClick={openDeposit} title="Create Deposit">
-              +
-            </span>
-          )}
-          {isAuth && (
-            <span style={{ cursor: "pointer", display: "flex", alignItems: "center", marginLeft: 4, fontWeight: 700, fontSize: 15 }}
-              onClick={handleShowBalance} title="Wallet Balance">$</span>
-          )}
-          <span style={{ cursor: "pointer", display: "flex", alignItems: "center", marginLeft: 4 }}
-            onClick={() => navigate("/wallet")} title="Wallet">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+          <span
+            style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+            onClick={() => navigate("/account")} title="Account">
+            <span className={`status-dot ${isAuth ? "status-dot-connected" : "status-dot-disconnected"}`} />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
             </svg>
           </span>
-          <span style={{ cursor: "pointer", display: "flex", alignItems: "center", marginLeft: 2 }}
-            onClick={() => setShowInfo(true)} title="App info">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-          </span>
-          {isAuth && (<button className="btn btn-sm" onClick={handleLogout} style={{ marginLeft: 4 }}>Logout</button>)}
         </div>
       </header>
 
       <main className="app-content"><Outlet context={context} /></main>
       <BottomNav authenticated={isAuth} walletLoaded={walletLoaded} />
 
-      {/* ---- Info modal ---- */}
-      {showInfo && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setShowInfo(false)}>
-          <div style={{ background: "var(--color-canvas)", borderRadius: "var(--rounded-md)", padding: "var(--space-xl)", maxWidth: 380, width: "90%", boxShadow: "var(--shadow-card)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div className="card-title">App Info</div>
-            <table style={{ marginTop: "var(--space-sm)" }}><tbody>
-              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Data dir</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/</td></tr>
-              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Wallet</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/wallet/keyfile.enc</td></tr>
-              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Session</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/session_token</td></tr>
-              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Config</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/config.toml</td></tr>
-            </tbody></table>
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setShowInfo(false)}>Close</button>
-          </div>
-        </div>
-      )}
-
-      {/* ---- Balance modal ---- */}
-      {showBalance && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setShowBalance(false)}>
-          <div style={{ background: "var(--color-canvas)", borderRadius: "var(--rounded-md)", padding: "var(--space-xl)", maxWidth: 380, width: "90%", boxShadow: "var(--shadow-card)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div className="card-title">Wallet Balance</div>
-            {balanceLoading ? (<p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>Loading...</p>)
-            : balance ? (<div style={{ marginTop: "var(--space-sm)" }}>{renderBalanceRows(balance)}</div>)
-            : (<p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>Failed to load balance.</p>)}
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setShowBalance(false)}>Close</button>
-          </div>
-        </div>
-      )}
-
       {/* ---- Deposit modal ---- */}
       {showDeposit && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={closeDeposit}>
-          <div style={{ background: "var(--color-canvas)", borderRadius: "var(--rounded-md)", padding: "var(--space-xl)", maxWidth: 420, width: "90%", boxShadow: "var(--shadow-card)", maxHeight: "90vh", overflowY: "auto" }}
-            onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="card-title">Create Deposit</div>
 
-            {depositStep === "form" && (
-              <>
-                <div className="form-group" style={{ marginTop: "var(--space-sm)" }}>
-                  <label className="form-label">Amount</label>
-                  <div style={{ display: "flex", gap: "var(--space-xs)", marginBottom: "var(--space-sm)" }}>
-                    {PRESETS.map((p) => (
-                      <button
-                        key={p}
-                        className={depPreset === p ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
-                        style={{ flex: 1, height: 44, fontSize: 16, fontWeight: 600 }}
-                        onClick={() => setDepPreset(p)}
-                      >
-                        ${p}
-                      </button>
-                    ))}
-                    <button
-                      className={depPreset === "other" ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
-                      style={{ flex: 1, height: 44, fontSize: 16, fontWeight: 600 }}
-                      onClick={() => setDepPreset("other")}
-                    >
-                      Other
-                    </button>
-                  </div>
-                  {depPreset === "other" && (
-                    <input
-                      type="number" step="0.01" min="0.01"
-                      className="form-input"
-                      value={depCustomAmount}
-                      onChange={(e) => setDepCustomAmount(e.target.value)}
-                      placeholder="Enter amount..."
-                    />
-                  )}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Currency</label>
-                  <select className="form-select" value={depCurrency} onChange={(e) => setDepCurrency(e.target.value)}>
-                    {currencies.map((c) => (<option key={c} value={c}>{c}</option>))}
-                  </select>
-                </div>
-                {depError && <div className="alert alert-error">{depError}</div>}
-                <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
-                  <button className="btn btn-primary" onClick={handleCreateDeposit}
-                    disabled={depLoading || depositAmount() === null}
-                    style={{ flex: 1 }}>{depLoading ? "Creating..." : "Create Deposit"}</button>
-                  <button className="btn btn-secondary" onClick={closeDeposit}>Cancel</button>
-                </div>
-              </>
-            )}
-
-            {depositStep === "created" && depResult && (
-              <>
-                <div className="alert alert-success" style={{ marginTop: "var(--space-sm)" }}>
-                  Deposit created — send exactly the amount shown to the address below
-                </div>
-                {qrDataUrl && (
-                  <div style={{ textAlign: "center", margin: "var(--space-md) 0" }}>
-                    <img src={qrDataUrl} alt="Payment QR" style={{ border: "1px solid var(--color-hairline)", borderRadius: "var(--rounded-sm)" }} />
-                  </div>
-                )}
-                <table style={{ marginBottom: "var(--space-md)" }}><tbody>
-                  {(depResult as any).pay_address && (
-                    <tr>
-                      <td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 8px 4px 0" }}>Address</td>
-                      <td className="font-mono" style={{ fontSize: 11, wordBreak: "break-all" }}>{(depResult as any).pay_address}</td>
-                    </tr>
-                  )}
-                  {(depResult as any).pay_currency && (
-                    <tr>
-                      <td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 8px 4px 0" }}>Currency</td>
-                      <td className="font-mono" style={{ fontSize: 12 }}>{(depResult as any).pay_currency}</td>
-                    </tr>
-                  )}
-                  {(depResult as any).pay_amount != null && (
-                    <tr>
-                      <td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 8px 4px 0" }}>Amount</td>
-                      <td className="font-mono" style={{ fontSize: 12 }}>{(depResult as any).pay_amount}</td>
-                    </tr>
-                  )}
-                  {(depResult as any).deposit_id && (
-                    <tr>
-                      <td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 8px 4px 0" }}>Deposit ID</td>
-                      <td className="font-mono" style={{ fontSize: 11 }}>{(depResult as any).deposit_id}</td>
-                    </tr>
-                  )}
-                </tbody></table>
-                <div style={{ textAlign: "center", marginBottom: "var(--space-md)" }}>
-                  <span style={{ fontSize: 24, fontFamily: "var(--font-mono)", color: countdown < 60 ? "var(--color-error)" : "var(--color-ink)" }}>
-                    {formatCountdown(countdown)}
-                  </span>
-                  <div className="text-muted" style={{ fontSize: 12 }}>time remaining</div>
-                </div>
-                <button className="btn btn-secondary btn-sm" style={{ width: "100%" }} onClick={closeDeposit}>Close</button>
-              </>
-            )}
-
-            {depositStep === "completed" && depResult && (
-              <>
-                <div className="alert alert-success" style={{ marginTop: "var(--space-sm)" }}>
-                  Funds received!
-                </div>
-                <table style={{ marginTop: "var(--space-sm)", marginBottom: "var(--space-md)" }}><tbody>
-                  <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 8px 4px 0" }}>Status</td><td className="font-mono" style={{ fontSize: 12 }}>{(depResult as any).status || "completed"}</td></tr>
-                  {(depResult as any).amount_microcredits != null && (
-                    <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 8px 4px 0" }}>Credited</td><td className="font-mono" style={{ fontSize: 13 }}>{formatUsd((depResult as any).amount_microcredits)}</td></tr>
-                  )}
-                </tbody></table>
-                <button className="btn btn-primary btn-sm" style={{ width: "100%" }} onClick={closeDeposit}>Done</button>
-              </>
-            )}
-
-            {depositStep === "expired" && (
-              <>
-                <div className="alert alert-error" style={{ marginTop: "var(--space-sm)" }}>
-                  Payment time expired. Please create a new deposit.
-                </div>
-                <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => { setDepositStep("form"); setDepPreset(10); setDepCustomAmount(""); setDepError(""); setCountdown(DEPOSIT_TIMEOUT_SECS); }}>Try Again</button>
-                  <button className="btn btn-secondary" onClick={closeDeposit}>Close</button>
-                </div>
-              </>
-            )}
+            <div className="form-group" style={{ marginTop: "var(--space-sm)" }}>
+              <label className="form-label">Amount</label>
+              <div style={{ display: "flex", gap: "var(--space-xs)", marginBottom: "var(--space-sm)" }}>
+                {PRESETS.map((p) => (
+                  <button
+                    key={p}
+                    className={depPreset === p ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
+                    style={{ flex: 1, height: 36, fontSize: 14, fontWeight: 600 }}
+                    onClick={() => setDepPreset(p)}
+                  >
+                    ${p}
+                  </button>
+                ))}
+                <button
+                  className={depPreset === "other" ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
+                  style={{ flex: 1, height: 36, fontSize: 14, fontWeight: 600 }}
+                  onClick={() => setDepPreset("other")}
+                >
+                  Other
+                </button>
+              </div>
+              {depPreset === "other" && (
+                <input
+                  type="number" step="0.01" min="0.01"
+                  className="form-input"
+                  value={depCustomAmount}
+                  onChange={(e) => setDepCustomAmount(e.target.value)}
+                  placeholder="Enter amount..."
+                />
+              )}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Currency</label>
+              <select className="form-select" value={depCurrency} onChange={(e) => setDepCurrency(e.target.value)}>
+                {currencies.map((c) => (<option key={c} value={c}>{c}</option>))}
+              </select>
+            </div>
+            {depError && <div className="alert alert-error">{depError}</div>}
+            <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
+              <button className="btn btn-primary" onClick={handleCreateDeposit}
+                disabled={depLoading || depositAmount() === null}
+                style={{ flex: 1 }}>{depLoading ? "Creating..." : "Create Deposit"}</button>
+              <button className="btn btn-secondary" onClick={closeDeposit}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

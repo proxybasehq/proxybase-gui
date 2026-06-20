@@ -1,7 +1,37 @@
-# Tauri + React + Typescript
+# ProxyBase GUI
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Desktop GUI application for ProxyBase, built with React + Vite + Tauri.
 
-## Recommended IDE Setup
+## Prerequisites
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- Node.js 20+
+- pnpm 9+
+- Rust stable toolchain
+- Platform dependencies required by Tauri (WebKitGTK/GTK on Linux)
+
+## Development
+
+```bash
+pnpm install
+pnpm tauri:dev
+```
+
+## Production Build
+
+```bash
+pnpm install --frozen-lockfile
+pnpm tauri:build
+```
+
+## Release Automation
+
+This repository includes GitHub workflows for:
+
+- Cross-platform CI builds on Linux, Windows, macOS Intel, and macOS Apple Silicon
+- Tagged production release builds and artifact publishing to GitHub Releases
+
+Release tag format:
+
+```bash
+proxybase-gui-v0.1.0
+```

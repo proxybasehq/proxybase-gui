@@ -1,9 +1,13 @@
 [package]
 name = "proxybase-gui"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "ProxyBase desktop GUI built with Tauri"
+authors = ["ProxyBase Team"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/proxybasehq/proxybase-gui"
+homepage = "https://proxybase.xyz"
+rust-version = "1.78"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,7 +26,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-autostart = "2"
-libproxybase = { path = "../../libproxybase" }
+libproxybase = "0.4.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["json"] }
@@ -32,6 +36,13 @@ hex = "0.4"
 dirs = "5"
 anyhow = "1"
 tokio = { version = "1", features = ["sync", "time", "net", "io-util", "macros"] }
-fast-socks5 = { path = "../../proxybase2-backend/fast-socks5" }
+fast-socks5 = "1.0.0"
 rand = "0.8"
+tauri-plugin-positioner = { version = "2.3.2", features = ["tray-icon"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
 

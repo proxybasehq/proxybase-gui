@@ -6,6 +6,8 @@ import LoginPage from "./pages/LoginPage";
 import MarketPage from "./pages/MarketPage";
 import SellerPage from "./pages/SellerPage";
 import FaqPage from "./pages/FaqPage";
+import AccountPage from "./pages/AccountPage";
+import DepositPage from "./pages/DepositPage";
 import "./App.css";
 
 export default function App() {
@@ -18,6 +20,8 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/market" element={<MarketPage />} />
           <Route path="/seller" element={<SellerPage />} />
+          <Route path="/account" element={<AccountPage />} />
+          <Route path="/deposit" element={<DepositPage />} />
           <Route path="/faq" element={<FaqPage />} />
         </Route>
       </Routes>
