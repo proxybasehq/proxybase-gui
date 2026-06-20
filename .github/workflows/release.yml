@@ -103,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          sha256sum * > SHA256SUMS.txt
+          find . -type f ! -name SHA256SUMS.txt -exec sha256sum {} + | sort > SHA256SUMS.txt
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
