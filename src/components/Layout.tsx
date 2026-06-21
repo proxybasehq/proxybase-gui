@@ -146,6 +146,11 @@ export default function Layout() {
     listen<string>("seller:reconnecting", (event) => {
       setSellerError(event.payload);
     }).then((fn) => unlistens.push(fn));
+    listen<{ session_id: string; target: string; error: string; upstream: boolean }>("seller:stream-error", (event) => {
+      const { target, error, upstream } = event.payload;
+      const via = upstream ? "upstream" : "direct";
+      setSellerError(`[${via}] ${target}: ${error}`);
+    }).then((fn) => unlistens.push(fn));
     return () => { unlistens.forEach((fn) => fn()); };
   }, []);
 

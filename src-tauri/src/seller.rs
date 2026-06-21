@@ -99,6 +99,7 @@ fn base64_decode(encoded: &str) -> Option<Vec<u8>> {
 // ---------------------------------------------------------------------------
 
 async fn run_stream_relay(
+    app_handle: AppHandle,
     target_ip: &str,
     target_port: u16,
     upstream: Option<&UpstreamProxy>,
@@ -108,17 +109,20 @@ async fn run_stream_relay(
 ) {
     let sid = sid.to_string();
     let connect_timeout = Duration::from_secs(10);
+    let using_upstream = upstream.is_some();
 
     let connect_fut = async {
         match upstream {
             Some(proxy) => {
+                let mut cfg = fast_socks5::client::Config::default();
+                cfg.set_connect_timeout(Duration::from_secs(8));
                 match fast_socks5::client::Socks5Stream::connect_with_password(
                     &proxy.address,
                     target_ip.to_string(),
                     target_port,
                     proxy.username.clone(),
                     proxy.password.clone(),
-                    fast_socks5::client::Config::default(),
+                    cfg,
                 )
                 .await
                 {
@@ -143,17 +147,28 @@ async fn run_stream_relay(
     let connect_result = match tokio::time::timeout(connect_timeout, connect_fut).await {
         Ok(Ok(streams)) => streams,
         Ok(Err(e)) => {
-            eprintln!("[RELAY {}] {}:{} — connect error: {}", sid, target_ip, target_port, e);
+            let msg = format!("{}:{} — {}", target_ip, target_port, e);
+            let _ = app_handle.emit("seller:stream-error", serde_json::json!({
+                "session_id": sid,
+                "target": format!("{}:{}", target_ip, target_port),
+                "error": msg,
+                "upstream": using_upstream,
+            }));
             return;
         }
         Err(_elapsed) => {
-            eprintln!("[RELAY {}] {}:{} — connect timed out after {:?}", sid, target_ip, target_port, connect_timeout);
+            let msg = format!("{}:{} — connect timed out", target_ip, target_port);
+            let _ = app_handle.emit("seller:stream-error", serde_json::json!({
+                "session_id": sid,
+                "target": format!("{}:{}", target_ip, target_port),
+                "error": msg,
+                "upstream": using_upstream,
+            }));
             return;
         }
     };
 
     let (mut tcp_r, mut tcp_w) = connect_result;
-    eprintln!("[RELAY {}] {}:{} — connected", sid, target_ip, target_port);
 
     let tx2 = relay_tx.clone();
     let sid2 = sid.clone();
@@ -434,7 +449,9 @@ async fn run_single_ws_session(
                                     let sid2 = sid.clone();
                                     tokio::spawn(async move {
                                         let up_ref: Option<&UpstreamProxy> = up.as_ref();
-                                        run_stream_relay(&tip, tport, up_ref, &tx, tcp_rx, &sid2).await;
+                                        run_stream_relay(
+                                            app_handle2.clone(), &tip, tport, up_ref, &tx, tcp_rx, &sid2,
+                                        ).await;
                                         streams.lock().await.remove(&sid2);
                                         let _ = app_handle2.emit("seller:stream-closed", &sid2);
                                     });
