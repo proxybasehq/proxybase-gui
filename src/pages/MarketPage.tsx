@@ -3,7 +3,7 @@ import { useOutletContext, Navigate } from "react-router-dom";
 import { listPricing, createSession, closeSession, listSessions, getToken } from "../api";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
-import { formatUsdPerGb, countryFlag, countryName } from "../utils";
+import { formatUsdPerGb, countryFlag } from "../utils";
 
 export default function MarketPage() {
   const { backendUrl } = useBackend();
@@ -173,7 +173,7 @@ export default function MarketPage() {
                     const loading = priceBuyLoading === key;
                     return (
                     <tr key={i}>
-                      <td>{countryFlag(c)} {countryName(c)}</td>
+                      <td>{countryFlag(c)} {c}</td>
                       <td><span className="badge">{nt}</span></td>
                       <td className="font-mono">{formatUsdPerGb((p as any).buyer_price_microcredits_per_gb)}</td>
                       <td>

@@ -21,13 +21,16 @@ export function formatUsdPerGb(microcreditsPerGb: number): string {
 
 // ---- Country helpers ----
 
-/** Convert 2-letter country code to flag emoji (🇺🇸, 🇩🇪, etc.) */
+/** Convert 2-letter country code to flag emoji (🇺🇸, 🇩🇪, etc.). Returns empty string on invalid input. */
 export function countryFlag(code: string): string {
   const upper = code.toUpperCase();
   if (upper.length !== 2) return "";
-  const a = 0x1F1E6 + (upper.charCodeAt(0) - 65);
-  const b = 0x1F1E6 + (upper.charCodeAt(1) - 65);
-  return String.fromCodePoint(a, b);
+  const a = upper.charCodeAt(0);
+  const b = upper.charCodeAt(1);
+  if (a < 65 || a > 90 || b < 65 || b > 90) return "";
+  const ra = 0x1F1E6 + (a - 65);
+  const rb = 0x1F1E6 + (b - 65);
+  return String.fromCodePoint(ra, rb);
 }
 
 /** Common country names keyed by ISO 3166-1 alpha-2 code */

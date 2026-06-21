@@ -4,6 +4,7 @@ import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
 import { getBalance } from "../api";
 import { formatUsd } from "../utils";
+import { version } from "../../package.json";
 
 export default function AccountPage() {
   const navigate = useNavigate();
@@ -111,6 +112,7 @@ export default function AccountPage() {
           <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Wallet</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/wallet/keyfile.enc</td></tr>
           <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Session</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/session_token</td></tr>
           <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Config</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/config.toml</td></tr>
+          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Version</td><td className="font-mono" style={{ fontSize: 12 }}>v{version}</td></tr>
         </tbody></table>
       </div>
 

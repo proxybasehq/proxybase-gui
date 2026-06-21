@@ -298,7 +298,33 @@ async fn run_single_ws_session(
     let (ws, _resp) = match tokio_tungstenite::connect_async(&ws_url).await {
         Ok(c) => c,
         Err(e) => {
-            return WsDisconnect::Error(format!("WebSocket connect failed: {}", e));
+            let err_msg = format!("{}", e);
+            // If token is stale (backend restarted), refresh and retry once
+            if err_msg.to_lowercase().contains("auth")
+                || err_msg.to_lowercase().contains("401")
+                || err_msg.to_lowercase().contains("token")
+            {
+                if crate::commands::reauth(backend_url).await.is_ok() {
+                    let new_client = BackendClient::new(backend_url);
+                    let new_url = new_client.ws_url_for_seller();
+                    match tokio_tungstenite::connect_async(&new_url).await {
+                        Ok(c) => c,
+                        Err(e2) => {
+                            return WsDisconnect::Error(format!(
+                                "WebSocket connect failed after reauth: {}",
+                                e2
+                            ));
+                        }
+                    }
+                } else {
+                    return WsDisconnect::Error(format!(
+                        "WebSocket connect failed and reauth failed: {}",
+                        err_msg
+                    ));
+                }
+            } else {
+                return WsDisconnect::Error(format!("WebSocket connect failed: {}", e));
+            }
         }
     };
 

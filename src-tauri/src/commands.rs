@@ -46,7 +46,7 @@ fn require_auth(client: &BackendClient) -> Result<(), String> {
 }
 
 /// Silently re-authenticate using the on-disk wallet (no password).
-async fn reauth(backend_url: &str) -> Result<(), String> {
+pub(crate) async fn reauth(backend_url: &str) -> Result<(), String> {
     let data_dir = wallet_dir();
     let mut wm =
         libproxybase::WalletManager::new(data_dir).map_err(|e| e.to_string())?;
