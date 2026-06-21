@@ -3,7 +3,7 @@ import { useOutletContext, Navigate } from "react-router-dom";
 import { listPricing, createSession, closeSession, listSessions, getToken } from "../api";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
-import { formatUsdPerGb, countryFlag } from "../utils";
+import { formatUsdPerGb } from "../utils";
 
 export default function MarketPage() {
   const { backendUrl } = useBackend();
@@ -173,7 +173,11 @@ export default function MarketPage() {
                     const loading = priceBuyLoading === key;
                     return (
                     <tr key={i}>
-                      <td>{countryFlag(c)} {c}</td>
+                      <td>
+                        <span className="country-code">
+                          <span className="country-code-flag">{c}</span>
+                        </span>
+                      </td>
                       <td><span className="badge">{nt}</span></td>
                       <td className="font-mono">{formatUsdPerGb((p as any).buyer_price_microcredits_per_gb)}</td>
                       <td>
@@ -223,7 +227,11 @@ export default function MarketPage() {
                   {sessions.map((s) => (
                     <tr key={(s as any).session_id} style={{ cursor: "pointer" }} onClick={() => setConnectModal(s)}>
                       <td className="font-mono" style={{ fontSize: 11 }}>{(s as any).session_id?.slice(0, 16)}...</td>
-                      <td>{countryFlag((s as any).country)} {(s as any).country}</td>
+                      <td>
+                        <span className="country-code">
+                          <span className="country-code-flag">{(s as any).country}</span>
+                        </span>
+                      </td>
                       <td><span className="badge">{(s as any).network_type || (s as any).proxy_category || "-"}</span></td>
                       <td><span className="badge">{(s as any).session_type || "-"}</span></td>
                       <td><span className={`badge ${(s as any).status === "active" ? "badge-success" : ""}`}>{(s as any).status || "-"}</span></td>
