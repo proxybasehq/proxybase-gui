@@ -48,7 +48,10 @@ pub fn run() {
                                 let _ = window.hide();
                             } else {
                                 use tauri_plugin_positioner::{Position, WindowExt};
+                                #[cfg(target_os = "macos")]
                                 let _ = window.move_window_constrained(Position::TrayBottomCenter);
+                                #[cfg(not(target_os = "macos"))]
+                                let _ = window.move_window_constrained(Position::TrayCenter);
                                 let _ = window.show();
                                 let _ = window.set_focus();
                             }
