@@ -48,7 +48,7 @@ pub fn run() {
                                 let _ = window.hide();
                             } else {
                                 use tauri_plugin_positioner::{Position, WindowExt};
-                                let _ = window.move_window(Position::TrayBottomCenter);
+                                let _ = window.move_window_constrained(Position::TrayBottomCenter);
                                 let _ = window.show();
                                 let _ = window.set_focus();
                             }
