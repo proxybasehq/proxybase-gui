@@ -461,12 +461,15 @@ async fn try_single_path_connection(
                                         mpsc::unbounded_channel::<Vec<u8>>();
                                     streams.lock().await.insert(sid.clone(), tcp_tx);
 
-                                    let _ = app_handle.emit("seller:stream-open", StreamEvent {
-                                        session_id: sid.clone(),
-                                        target_ip: tip.clone(),
-                                        target_port: tport,
-                                        route_index: None,
-                                    });
+                                    // Don't emit stream-open for QoS probes — they're transient
+                                    if !sid.starts_with("probe_") {
+                                        let _ = app_handle.emit("seller:stream-open", StreamEvent {
+                                            session_id: sid.clone(),
+                                            target_ip: tip.clone(),
+                                            target_port: tport,
+                                            route_index: None,
+                                        });
+                                    }
 
                                     let app_handle2 = app_handle.clone();
                                     let sid2 = sid.clone();
@@ -484,7 +487,9 @@ async fn try_single_path_connection(
                                         )
                                         .await;
                                         streams.lock().await.remove(&sid2);
-                                        let _ = app_handle2.emit("seller:stream-closed", &sid2);
+                                        if !sid2.starts_with("probe_") {
+                                            let _ = app_handle2.emit("seller:stream-closed", &sid2);
+                                        }
                                     });
                                 }
                                 _ => {}

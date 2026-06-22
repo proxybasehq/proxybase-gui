@@ -378,7 +378,7 @@ textarea.form-input {
 
 /* ---- Tables ---- */
 .table-container {
-  overflow-x: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
