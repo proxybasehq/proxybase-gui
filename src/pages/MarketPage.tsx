@@ -142,6 +142,7 @@ export default function MarketPage() {
               <tbody>
                 <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Proxy Address</td><td className="font-mono" style={{ fontSize: 12 }}>{PROXY_ADDRESS}</td></tr>
                 <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Username</td><td className="font-mono" style={{ fontSize: 12, wordBreak: "break-all" }}>{(connectModal as any).session_id}</td></tr>
+                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Session ID</td><td className="font-mono" style={{ fontSize: 11, wordBreak: "break-all" }}>{(connectModal as any).session_id}</td></tr>
                 <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Password</td><td className="font-mono" style={{ fontSize: 12 }}>{token.slice(0, 20)}...</td></tr>
                 <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Country</td><td className="font-mono" style={{ fontSize: 12 }}>{(connectModal as any).country}</td></tr>
                 <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Type</td><td className="font-mono" style={{ fontSize: 12 }}>{(connectModal as any).network_type || (connectModal as any).proxy_category}</td></tr>
@@ -215,7 +216,6 @@ export default function MarketPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>Session ID</th>
                     <th>Country</th>
                     <th>Type</th>
                     <th>Mode</th>
@@ -226,7 +226,6 @@ export default function MarketPage() {
                 <tbody>
                   {sessions.map((s) => (
                     <tr key={(s as any).session_id} style={{ cursor: "pointer" }} onClick={() => setConnectModal(s)}>
-                      <td className="font-mono" style={{ fontSize: 11 }}>{(s as any).session_id?.slice(0, 16)}...</td>
                       <td>
                         <span className="country-code">
                           <span className="country-code-flag">{(s as any).country}</span>
