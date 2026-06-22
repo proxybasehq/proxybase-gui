@@ -180,8 +180,8 @@ export default function MarketPage() {
             </table>
             <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl)</div>
             <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
-              onClick={() => copyToClipboard(`curl --socks5 ${PROXY_ADDRESS} --proxy-user ${(connectModal as any).session_id}:${token} https://httpbin.org/ip`, "Example")}>
-              curl --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  https://httpbin.org/ip
+              onClick={() => copyToClipboard(`curl --socks5 ${PROXY_ADDRESS} --proxy-user ${(connectModal as any).session_id}:${token} http://api.proxybase.xyz/v2/ip`, "Example")}>
+              curl --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  http://api.proxybase.xyz/v2/ip
               {copied === "Example" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
             </pre>
             <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setConnectModal(null)}>Close</button>
