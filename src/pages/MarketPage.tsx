@@ -3,7 +3,7 @@ import { useOutletContext, Navigate } from "react-router-dom";
 import { listPricing, createSession, closeSession, listSessions, getToken } from "../api";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
-import { formatUsdPerGb } from "../utils";
+import { formatUsdPerGb, PROXY_ADDRESS } from "../utils";
 
 export default function MarketPage() {
   const { backendUrl } = useBackend();
@@ -140,7 +140,7 @@ export default function MarketPage() {
             <div className="card-title">Proxy Connection Details</div>
             <table style={{ marginTop: "var(--space-sm)" }}>
               <tbody>
-                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Proxy Address</td><td className="font-mono" style={{ fontSize: 12 }}>127.0.0.1:1082</td></tr>
+                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Proxy Address</td><td className="font-mono" style={{ fontSize: 12 }}>{PROXY_ADDRESS}</td></tr>
                 <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Username</td><td className="font-mono" style={{ fontSize: 12, wordBreak: "break-all" }}>{(connectModal as any).session_id}</td></tr>
                 <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Password</td><td className="font-mono" style={{ fontSize: 12 }}>{token.slice(0, 20)}...</td></tr>
                 <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Country</td><td className="font-mono" style={{ fontSize: 12 }}>{(connectModal as any).country}</td></tr>
@@ -148,7 +148,7 @@ export default function MarketPage() {
               </tbody>
             </table>
             <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl)</div>
-            <pre className="json-view" style={{ fontSize: 11 }}>curl --socks5 127.0.0.1:1082 \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  https://httpbin.org/ip</pre>
+            <pre className="json-view" style={{ fontSize: 11 }}>curl --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  https://httpbin.org/ip</pre>
             <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setConnectModal(null)}>Close</button>
           </div>
         </div>

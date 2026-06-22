@@ -1,3 +1,8 @@
+// SOCKS5 proxy address — local in dev, remote in production
+export const PROXY_ADDRESS = import.meta.env.PROD
+  ? "api.proxybase.xyz:1082"
+  : "127.0.0.1:1082";
+
 // 1,000,000 microcredits = $1.00
 const MC_PER_USD = 1_000_000;
 
