@@ -29,7 +29,6 @@ pub struct StreamEvent {
     pub route_index: Option<usize>,
 }
 
-
 // ---------------------------------------------------------------------------
 // Seller state managed by Tauri
 // ---------------------------------------------------------------------------
@@ -100,7 +99,8 @@ fn base64_decode(encoded: &str) -> Option<Vec<u8>> {
 
 async fn run_stream_relay(
     app_handle: AppHandle,
-    target_ip: &str,
+    target_dest: &str, // domain/IP for SOCKS5 routing
+    target_ip: &str,   // IP for direct TCP
     target_port: u16,
     upstream: Option<&UpstreamProxy>,
     relay_tx: &mpsc::UnboundedSender<Message>,
@@ -108,76 +108,63 @@ async fn run_stream_relay(
     sid: &str,
 ) {
     let sid = sid.to_string();
-    let connect_timeout = Duration::from_secs(10);
     let using_upstream = upstream.is_some();
 
-    let connect_fut = async {
-        match upstream {
-            Some(proxy) => {
-                let mut cfg = fast_socks5::client::Config::default();
-                cfg.set_connect_timeout(Duration::from_secs(8));
-                match fast_socks5::client::Socks5Stream::connect_with_password(
-                    &proxy.address,
-                    target_ip.to_string(),
-                    target_port,
-                    proxy.username.clone(),
-                    proxy.password.clone(),
-                    cfg,
-                )
-                .await
-                {
-                    Ok(stream) => {
-                        let (r, w) = tokio::io::split(stream);
-                        Ok((Box::new(r) as Box<dyn tokio::io::AsyncRead + Unpin + Send>, Box::new(w) as Box<dyn tokio::io::AsyncWrite + Unpin + Send>))
-                    }
-                    Err(e) => Err(anyhow::anyhow!("SOCKS5 connect failed: {:?}", e)),
-                }
-            }
-            None => match tokio::net::TcpStream::connect(format!("{}:{}", target_ip, target_port)).await
+    let connect_result: anyhow::Result<(
+        Box<dyn tokio::io::AsyncRead + Unpin + Send>,
+        Box<dyn tokio::io::AsyncWrite + Unpin + Send>,
+    )> = match upstream {
+        Some(proxy) => {
+            match fast_socks5::client::Socks5Stream::connect_with_password(
+                &proxy.address,
+                target_dest.to_string(),
+                target_port,
+                proxy.username.clone(),
+                proxy.password.clone(),
+                fast_socks5::client::Config::default(),
+            )
+            .await
             {
+                Ok(stream) => {
+                    let (r, w) = tokio::io::split(stream);
+                    Ok((Box::new(r), Box::new(w)))
+                }
+                Err(e) => Err(anyhow::anyhow!("SOCKS5 upstream connect failed: {:?}", e)),
+            }
+        }
+        None => {
+            match tokio::net::TcpStream::connect(format!("{}:{}", target_ip, target_port)).await {
                 Ok(tcp) => {
                     let (r, w) = tokio::io::split(tcp);
-                    Ok((Box::new(r) as Box<dyn tokio::io::AsyncRead + Unpin + Send>, Box::new(w) as Box<dyn tokio::io::AsyncWrite + Unpin + Send>))
+                    Ok((Box::new(r), Box::new(w)))
                 }
                 Err(e) => Err(anyhow::anyhow!("TCP connect failed: {}", e)),
-            },
+            }
         }
     };
 
-    let connect_result = match tokio::time::timeout(connect_timeout, connect_fut).await {
-        Ok(Ok(streams)) => streams,
-        Ok(Err(e)) => {
-            let msg = format!("{}:{} — {}", target_ip, target_port, e);
-            let _ = app_handle.emit("seller:stream-error", serde_json::json!({
-                "session_id": sid,
-                "target": format!("{}:{}", target_ip, target_port),
-                "error": msg,
-                "upstream": using_upstream,
-            }));
-            return;
-        }
-        Err(_elapsed) => {
-            let msg = format!("{}:{} — connect timed out", target_ip, target_port);
-            let _ = app_handle.emit("seller:stream-error", serde_json::json!({
-                "session_id": sid,
-                "target": format!("{}:{}", target_ip, target_port),
-                "error": msg,
-                "upstream": using_upstream,
-            }));
+    let (mut tcp_r, mut tcp_w) = match connect_result {
+        Ok(streams) => streams,
+        Err(e) => {
+            let _ = app_handle.emit(
+                "seller:stream-error",
+                serde_json::json!({
+                    "session_id": sid,
+                    "target": format!("{}:{}", target_ip, target_port),
+                    "error": format!("{}/{}:{} — {}", target_dest, target_ip, target_port, e),
+                    "upstream": using_upstream,
+                }),
+            );
             return;
         }
     };
-
-    let (mut tcp_r, mut tcp_w) = connect_result;
 
     let tx2 = relay_tx.clone();
     let sid2 = sid.clone();
-    let (done_tx, mut done_rx) = tokio::sync::oneshot::channel::<()>();
 
     // TCP reads → WS relay_response
     let tcp_to_ws = tokio::spawn(async move {
         let mut buf = vec![0u8; 8192];
-        let _done_tx = done_tx; // move into this task; dropped when task finishes
         loop {
             match tokio::io::AsyncReadExt::read(&mut tcp_r, &mut buf).await {
                 Ok(0) => break,
@@ -198,39 +185,41 @@ async fn run_stream_relay(
                 Err(_) => break,
             }
         }
-        // done_tx dropped here → signals the write loop to stop
     });
 
-    // WS relay_data → TCP writes, stopping when either channel closes or TCP read side dies
-    loop {
-        tokio::select! {
-            data = tcp_rx.recv() => {
-                match data {
-                    Some(d) => {
-                        if tokio::io::AsyncWriteExt::write_all(&mut tcp_w, &d).await.is_err() {
-                            eprintln!("[RELAY {}] TCP write error", sid);
-                            break;
-                        }
-                    }
-                    None => {
-                        eprintln!("[RELAY {}] relay_data channel closed", sid);
-                        break;
-                    }
-                }
-            }
-            _ = &mut done_rx => {
-                eprintln!("[RELAY {}] TCP read side closed", sid);
-                break; // TCP read side closed
-            }
+    // WS relay_data → TCP writes
+    while let Some(data) = tcp_rx.recv().await {
+        if tokio::io::AsyncWriteExt::write_all(&mut tcp_w, &data)
+            .await
+            .is_err()
+        {
+            break;
         }
     }
     tcp_to_ws.abort();
-    eprintln!("[RELAY {}] closed", sid);
 }
 
 // ---------------------------------------------------------------------------
-// Seller WebSocket loop with auto-reconnect (mirrors CLI)
+// Seller: per-path WebSocket connections (mirrors CLI)
 // ---------------------------------------------------------------------------
+
+/// Build the list of paths: direct (None) + each upstream proxy.
+fn build_paths(
+    upstreams: &[UpstreamProxy],
+    include_direct: bool,
+) -> Vec<(String, Option<UpstreamProxy>)> {
+    let mut paths: Vec<(String, Option<UpstreamProxy>)> = Vec::new();
+    if include_direct {
+        paths.push(("direct".to_string(), None));
+    }
+    for (i, u) in upstreams.iter().enumerate() {
+        paths.push((format!("upstream_{}", i), Some(u.clone())));
+    }
+    if paths.is_empty() {
+        paths.push(("direct".to_string(), None));
+    }
+    paths
+}
 
 pub async fn run_seller_ws_loop(
     app_handle: AppHandle,
@@ -239,113 +228,150 @@ pub async fn run_seller_ws_loop(
     include_direct: bool,
     mut shutdown_rx: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<()> {
-    let pool: Vec<Option<UpstreamProxy>> = {
-        let mut v: Vec<Option<UpstreamProxy>> = Vec::new();
-        if include_direct || upstreams.is_empty() {
-            v.push(None);
-        }
-        for u in upstreams {
-            v.push(Some(u));
-        }
-        v
-    };
-    let pool = Arc::new(pool);
+    let paths = build_paths(&upstreams, include_direct);
+    let base_url = backend_url.clone();
 
+    let path_ids: Vec<String> = paths.iter().map(|(id, _)| id.clone()).collect();
+    let _ = app_handle.emit(
+        "seller:connected",
+        format!("Starting {} path(s): {:?}", paths.len(), path_ids),
+    );
+
+    // Spawn one connection per path — each runs independently with its own reconnect loop
+    let mut handles = Vec::new();
+    for (path_id, upstream) in paths {
+        let app = app_handle.clone();
+        let url = base_url.clone();
+        let (shutdown_child_tx, shutdown_child_rx) = tokio::sync::oneshot::channel::<()>();
+        handles.push((
+            shutdown_child_tx,
+            tokio::spawn(async move {
+                run_single_path_loop(app, &url, &path_id, upstream.as_ref(), shutdown_child_rx)
+                    .await;
+            }),
+        ));
+    }
+
+    // Wait for shutdown signal
+    let _ = &mut shutdown_rx;
+
+    // Drain handles: send shutdown to all, then await all
+    let (senders, joins): (Vec<_>, Vec<_>) = handles.into_iter().unzip();
+    for tx in senders {
+        let _ = tx.send(());
+    }
+    for h in joins {
+        let _ = h.await;
+    }
+    let _ = app_handle.emit("seller:disconnected", "Seller stopped by user");
+    Ok(())
+}
+
+/// Single-path WebSocket connection loop with auto-reconnect and re-auth.
+async fn run_single_path_loop(
+    app_handle: AppHandle,
+    backend_url: &str,
+    path_id: &str,
+    upstream: Option<&UpstreamProxy>,
+    mut shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+) {
+    let upstream_owned = upstream.cloned();
+    let pid = path_id.to_string();
     let mut backoff_secs = 1u64;
 
     loop {
-        let result = run_single_ws_session(
-            app_handle.clone(),
-            &backend_url,
-            pool.clone(),
-            &mut shutdown_rx,
-        ).await;
+        // Always rebuild WS URL with fresh token from disk
+        let client = BackendClient::new(backend_url);
+        let token = client.token().unwrap_or("").to_string();
+        let ws_base = backend_url
+            .replace("https://", "wss://")
+            .replace("http://", "ws://");
+        let ws_url = format!("{}/v2/ws/seller?token={}", ws_base, token);
 
-        match result {
-            WsDisconnect::Stopped => {
-                let _ = app_handle.emit("seller:disconnected", "Seller stopped by user");
-                return Ok(());
+        let app = app_handle.clone();
+        let up = upstream_owned.clone();
+        let p = pid.clone();
+
+        match try_single_path_connection(app.clone(), &ws_url, &token, &p, up.as_ref()).await {
+            Ok(()) => {
+                backoff_secs = 1;
+                let _ = app.emit(
+                    "seller:disconnected",
+                    format!("[{}] Disconnected. Reconnecting...", p),
+                );
             }
-            WsDisconnect::Error(msg) => {
-                let _ = app_handle.emit("seller:error", msg);
-                // Fall through to reconnect
+            Err(e) if e.contains("AUTH_EXPIRED") => {
+                let _ = app.emit(
+                    "seller:reconnecting",
+                    format!("[{}] Token expired. Re-authenticating...", p),
+                );
+                if crate::commands::reauth(backend_url).await.is_ok() {
+                    backoff_secs = 1;
+                    let _ = app.emit("seller:connected", format!("[{}] Re-authenticated", p));
+                } else {
+                    let _ = app.emit(
+                        "seller:error",
+                        format!("[{}] Re-auth failed. Retrying...", p),
+                    );
+                    tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
+                    backoff_secs = (backoff_secs * 2).min(60);
+                }
             }
-            WsDisconnect::Closed => {
-                let _ = app_handle.emit("seller:disconnected", "Backend closed connection — reconnecting...");
-                // Fall through to reconnect
+            Err(e) => {
+                let _ = app.emit(
+                    "seller:error",
+                    format!("[{}] {} — retrying in {}s", p, e, backoff_secs),
+                );
+                tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
+                backoff_secs = (backoff_secs * 2).min(60);
             }
         }
 
-        // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s, cap at 60s, with 20% jitter
-        let jitter = (backoff_secs as f64 * 0.2 * (rand::random::<f64>() - 0.5)) as u64;
-        let delay = Duration::from_secs(backoff_secs.saturating_add(jitter));
-        backoff_secs = (backoff_secs * 2).min(60);
-
-        let _ = app_handle.emit("seller:reconnecting", format!("Reconnecting in {}s...", delay.as_secs()));
-
+        // Check for shutdown between reconnects
         tokio::select! {
             _ = &mut shutdown_rx => {
-                let _ = app_handle.emit("seller:disconnected", "Seller stopped by user");
-                return Ok(());
+                return;
             }
-            _ = tokio::time::sleep(delay) => {
-                // continue reconnect loop
-            }
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {}
         }
     }
 }
 
-enum WsDisconnect {
-    Stopped,
-    Error(String),
-    Closed,
-}
-
-async fn run_single_ws_session(
+/// Establish one WebSocket connection for a single path and relay until disconnect.
+async fn try_single_path_connection(
     app_handle: AppHandle,
-    backend_url: &str,
-    pool: Arc<Vec<Option<UpstreamProxy>>>,
-    shutdown_rx: &mut tokio::sync::oneshot::Receiver<()>,
-) -> WsDisconnect {
-    let client = BackendClient::new(backend_url);
-    let ws_url = client.ws_url_for_seller();
+    ws_url: &str,
+    token: &str,
+    path_id: &str,
+    upstream: Option<&UpstreamProxy>,
+) -> Result<(), String> {
+    let (ws, _resp) = tokio_tungstenite::connect_async(ws_url)
+        .await
+        .map_err(|e| format!("Failed to connect: {}", e))?;
 
-    let (ws, _resp) = match tokio_tungstenite::connect_async(&ws_url).await {
-        Ok(c) => c,
-        Err(e) => {
-            let err_msg = format!("{}", e);
-            // If token is stale (backend restarted), refresh and retry once
-            if err_msg.to_lowercase().contains("auth")
-                || err_msg.to_lowercase().contains("401")
-                || err_msg.to_lowercase().contains("token")
-            {
-                if crate::commands::reauth(backend_url).await.is_ok() {
-                    let new_client = BackendClient::new(backend_url);
-                    let new_url = new_client.ws_url_for_seller();
-                    match tokio_tungstenite::connect_async(&new_url).await {
-                        Ok(c) => c,
-                        Err(e2) => {
-                            return WsDisconnect::Error(format!(
-                                "WebSocket connect failed after reauth: {}",
-                                e2
-                            ));
-                        }
-                    }
-                } else {
-                    return WsDisconnect::Error(format!(
-                        "WebSocket connect failed and reauth failed: {}",
-                        err_msg
-                    ));
-                }
-            } else {
-                return WsDisconnect::Error(format!("WebSocket connect failed: {}", e));
-            }
-        }
-    };
-
-    let _ = app_handle.emit("seller:connected", "Connected to seller WebSocket");
+    let conn_id = uuid::Uuid::new_v4().to_string();
+    let _ = app_handle.emit(
+        "seller:connected",
+        format!("[{}] Connected (conn={})", path_id, &conn_id[..8]),
+    );
 
     let (mut ws_sink, mut ws_stream) = ws.split();
+
+    // Send auth token as first message (required by backend WS listener)
+    ws_sink
+        .send(Message::Text(token.to_string()))
+        .await
+        .map_err(|e| format!("Failed to send auth token: {}", e))?;
+
+    // Send path_info to identify this connection's path
+    let path_info = serde_json::json!({"type": "path_info", "path_id": path_id});
+    ws_sink
+        .send(Message::Text(
+            serde_json::to_string(&path_info).unwrap_or_default(),
+        ))
+        .await
+        .map_err(|e| format!("Failed to send path_info: {}", e))?;
+
     let (relay_tx, mut relay_rx) = mpsc::unbounded_channel::<Message>();
     let active: Arc<TokioMutex<HashMap<String, mpsc::UnboundedSender<Vec<u8>>>>> =
         Arc::new(TokioMutex::new(HashMap::new()));
@@ -358,16 +384,13 @@ async fn run_single_ws_session(
         }
     });
 
+    let upstream_owned = upstream.cloned();
     let mut ping_tick = interval(Duration::from_secs(30));
     let mut heartbeat_tick = interval(Duration::from_secs(60));
     let mut stream_count: u32 = 0;
 
     loop {
         tokio::select! {
-            _ = &mut *shutdown_rx => {
-                relay_drain.abort();
-                return WsDisconnect::Stopped;
-            }
             _ = ping_tick.tick() => {
                 let _ = relay_tx.send(Message::Ping(vec![].into()));
             }
@@ -375,7 +398,8 @@ async fn run_single_ws_session(
                 let hb = serde_json::json!({
                     "type": "heartbeat",
                     "active_streams": stream_count,
-                    "version": "0.1.0"
+                    "version": "0.1.0",
+                    "conn_id": conn_id,
                 });
                 let _ = relay_tx.send(Message::Text(serde_json::to_string(&hb).unwrap_or_default()));
             }
@@ -387,6 +411,11 @@ async fn run_single_ws_session(
                     Some(Ok(Message::Pong(_))) => {}
                     Some(Ok(Message::Text(text))) => {
                         if let Ok(p) = serde_json::from_str::<serde_json::Value>(&text) {
+                            // Detect auth-token rejection from the server
+                            if p.get("error").and_then(|v| v.as_str()) == Some("invalid_token") {
+                                relay_drain.abort();
+                                return Err("AUTH_EXPIRED".to_string());
+                            }
                             match p.get("type").and_then(|v| v.as_str()) {
                                 Some("relay_data") => {
                                     if let Some(enc) = p.get("data").and_then(|v| v.as_str()) {
@@ -418,31 +447,25 @@ async fn run_single_ws_session(
                                     let tport = p.get("target_port")
                                         .and_then(|v| v.as_u64())
                                         .unwrap_or(443) as u16;
-
-                                    let route_idx = p.get("route_index")
-                                        .and_then(|v| v.as_u64())
-                                        .map(|i| i as usize);
+                                    let thost = p.get("target_host")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string());
+                                    let dest = thost.unwrap_or_else(|| tip.clone());
 
                                     let streams = active.clone();
                                     let tx = relay_tx.clone();
-                                    let idx = route_idx.unwrap_or_else(|| {
-                                        let mut h: usize = 0;
-                                        for b in sid.as_bytes() {
-                                            h = h.wrapping_mul(31).wrapping_add(*b as usize);
-                                        }
-                                        h % pool.len()
-                                    });
-                                    let up = pool[idx].clone();
+                                    let up = upstream_owned.clone();
                                     stream_count += 1;
 
-                                    let (tcp_tx, tcp_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+                                    let (tcp_tx, tcp_rx) =
+                                        mpsc::unbounded_channel::<Vec<u8>>();
                                     streams.lock().await.insert(sid.clone(), tcp_tx);
 
                                     let _ = app_handle.emit("seller:stream-open", StreamEvent {
                                         session_id: sid.clone(),
                                         target_ip: tip.clone(),
                                         target_port: tport,
-                                        route_index: route_idx,
+                                        route_index: None,
                                     });
 
                                     let app_handle2 = app_handle.clone();
@@ -450,8 +473,16 @@ async fn run_single_ws_session(
                                     tokio::spawn(async move {
                                         let up_ref: Option<&UpstreamProxy> = up.as_ref();
                                         run_stream_relay(
-                                            app_handle2.clone(), &tip, tport, up_ref, &tx, tcp_rx, &sid2,
-                                        ).await;
+                                            app_handle2.clone(),
+                                            &dest,
+                                            &tip,
+                                            tport,
+                                            up_ref,
+                                            &tx,
+                                            tcp_rx,
+                                            &sid2,
+                                        )
+                                        .await;
                                         streams.lock().await.remove(&sid2);
                                         let _ = app_handle2.emit("seller:stream-closed", &sid2);
                                     });
@@ -462,22 +493,11 @@ async fn run_single_ws_session(
                     }
                     Some(Ok(Message::Close(_))) | None => {
                         relay_drain.abort();
-                        // Emit close for all remaining active streams so frontend can reset
-                        let remaining = active.lock().await;
-                        for sid in remaining.keys() {
-                            let _ = app_handle.emit("seller:stream-closed", sid);
-                        }
-                        drop(remaining);
-                        return WsDisconnect::Closed;
+                        return Ok(());
                     }
                     Some(Err(e)) => {
                         relay_drain.abort();
-                        let remaining = active.lock().await;
-                        for sid in remaining.keys() {
-                            let _ = app_handle.emit("seller:stream-closed", sid);
-                        }
-                        drop(remaining);
-                        return WsDisconnect::Error(format!("WS error: {}", e));
+                        return Err(format!("WS error: {}", e));
                     }
                     _ => {}
                 }
@@ -498,15 +518,14 @@ pub async fn start_seller(
     upstreams_json: String,
     include_direct: bool,
 ) -> Result<(), String> {
-    let upstreams: Vec<UpstreamProxy> =
-        serde_json::from_str(&upstreams_json).map_err(|e| format!("Invalid upstreams: {}", e))?;
+    let upstreams: Vec<UpstreamProxy> = serde_json::from_str(&upstreams_json)
+        .map_err(|e| format!("Invalid upstreams: {}", e))?;
 
     let (tx, rx) = tokio::sync::oneshot::channel();
 
     // Store shutdown handle
     {
         let mut shutdown = state.shutdown_tx.lock().map_err(|e| e.to_string())?;
-        // Stop any existing seller first
         *shutdown = Some(tx);
     }
 
