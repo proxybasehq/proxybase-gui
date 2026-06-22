@@ -208,7 +208,7 @@ export default function MarketPage() {
                     const loading = priceBuyLoading === key;
                     return (
                     <tr key={i}>
-                      <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <td style={{ whiteSpace: "nowrap" }}>
                         <CountryFlag code={c} />
                         <span style={{ fontSize: 12 }}>{c}</span>
                       </td>
@@ -259,7 +259,7 @@ export default function MarketPage() {
                 <tbody>
                   {sessions.map((s) => (
                     <tr key={(s as any).session_id} style={{ cursor: "pointer" }} onClick={() => setConnectModal(s)}>
-                      <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <td style={{ whiteSpace: "nowrap" }}>
                         <CountryFlag code={(s as any).country} />
                         <span style={{ fontSize: 12 }}>{(s as any).country}</span>
                       </td>
