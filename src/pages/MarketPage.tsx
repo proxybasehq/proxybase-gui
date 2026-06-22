@@ -4,6 +4,7 @@ import { listPricing, createSession, closeSession, listSessions, getToken } from
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
 import { formatUsdPerGb, PROXY_ADDRESS } from "../utils";
+import { CountryFlag } from "../components/CountryFlag";
 
 export default function MarketPage() {
   const { backendUrl } = useBackend();
@@ -13,6 +14,35 @@ export default function MarketPage() {
   const [activeTab, setActiveTab] = useState<"prices" | "sessions">("prices");
   const [error, setError] = useState("");
   const [insufficientFunds, setInsufficientFunds] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  async function copyToClipboard(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setCopied(label);
+    setTimeout(() => setCopied(null), 1500);
+  }
+
+  function copyTr({ label, value, full }: { label: string; value: string; full?: string }) {
+    const display = full ?? value;
+    return (
+      <tr onClick={() => copyToClipboard(full ?? value, label)} style={{ cursor: "pointer" }}>
+        <td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>{label}</td>
+        <td className="font-mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
+          {display}
+          {copied === label && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 10 }}>Copied!</span>}
+        </td>
+      </tr>
+    );
+  }
 
   const [allPricing, setAllPricing] = useState<Array<Record<string, unknown>>>([]);
   const [pricesLoading, setPricesLoading] = useState(false);
@@ -140,16 +170,20 @@ export default function MarketPage() {
             <div className="card-title">Proxy Connection Details</div>
             <table style={{ marginTop: "var(--space-sm)" }}>
               <tbody>
-                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Proxy Address</td><td className="font-mono" style={{ fontSize: 12 }}>{PROXY_ADDRESS}</td></tr>
-                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Username</td><td className="font-mono" style={{ fontSize: 12, wordBreak: "break-all" }}>{(connectModal as any).session_id}</td></tr>
-                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Session ID</td><td className="font-mono" style={{ fontSize: 11, wordBreak: "break-all" }}>{(connectModal as any).session_id}</td></tr>
-                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Password</td><td className="font-mono" style={{ fontSize: 12 }}>{token.slice(0, 20)}...</td></tr>
-                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Country</td><td className="font-mono" style={{ fontSize: 12 }}>{(connectModal as any).country}</td></tr>
-                <tr><td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>Type</td><td className="font-mono" style={{ fontSize: 12 }}>{(connectModal as any).network_type || (connectModal as any).proxy_category}</td></tr>
+                {copyTr({ label: "Proxy Address", value: PROXY_ADDRESS })}
+                {copyTr({ label: "Username", value: (connectModal as any).session_id })}
+                {copyTr({ label: "Session ID", value: (connectModal as any).session_id })}
+                {copyTr({ label: "Password", value: token.slice(0, 20) + "...", full: token })}
+                {copyTr({ label: "Country", value: (connectModal as any).country })}
+                {copyTr({ label: "Type", value: (connectModal as any).network_type || (connectModal as any).proxy_category })}
               </tbody>
             </table>
             <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl)</div>
-            <pre className="json-view" style={{ fontSize: 11 }}>curl --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  https://httpbin.org/ip</pre>
+            <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
+              onClick={() => copyToClipboard(`curl --socks5 ${PROXY_ADDRESS} --proxy-user ${(connectModal as any).session_id}:${token} https://httpbin.org/ip`, "Example")}>
+              curl --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  https://httpbin.org/ip
+              {copied === "Example" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
+            </pre>
             <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setConnectModal(null)}>Close</button>
           </div>
         </div>
@@ -174,10 +208,9 @@ export default function MarketPage() {
                     const loading = priceBuyLoading === key;
                     return (
                     <tr key={i}>
-                      <td>
-                        <span className="country-code">
-                          <span className="country-code-flag">{c}</span>
-                        </span>
+                      <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <CountryFlag code={c} />
+                        <span style={{ fontSize: 12 }}>{c}</span>
                       </td>
                       <td><span className="badge">{nt}</span></td>
                       <td className="font-mono">{formatUsdPerGb((p as any).buyer_price_microcredits_per_gb)}</td>
@@ -226,10 +259,9 @@ export default function MarketPage() {
                 <tbody>
                   {sessions.map((s) => (
                     <tr key={(s as any).session_id} style={{ cursor: "pointer" }} onClick={() => setConnectModal(s)}>
-                      <td>
-                        <span className="country-code">
-                          <span className="country-code-flag">{(s as any).country}</span>
-                        </span>
+                      <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <CountryFlag code={(s as any).country} />
+                        <span style={{ fontSize: 12 }}>{(s as any).country}</span>
                       </td>
                       <td><span className="badge">{(s as any).network_type || (s as any).proxy_category || "-"}</span></td>
                       <td><span className="badge">{(s as any).session_type || "-"}</span></td>

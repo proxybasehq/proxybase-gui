@@ -113,12 +113,17 @@ export default function AccountPage() {
           <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Session</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/session_token</td></tr>
           <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Config</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/config.toml</td></tr>
           <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Version</td><td className="font-mono" style={{ fontSize: 12 }}>v{version}</td></tr>
+          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Support</td><td className="font-mono" style={{ fontSize: 12 }}>humanshere@proxybase.xyz</td></tr>
         </tbody></table>
       </div>
 
       {/* ---- Actions ---- */}
       <div className="card">
-        <button className="btn btn-danger btn-sm" style={{ width: "100%" }} onClick={handleLogout}>
+        <a href="https://discord.gg/7uedk7ajHD" target="_blank" rel="noopener noreferrer"
+          className="btn btn-secondary btn-sm" style={{ textDecoration: "none", width: "100%" }}>
+          Support
+        </a>
+        <button className="btn btn-danger btn-sm" style={{ width: "100%", marginTop: "var(--space-xs)" }} onClick={handleLogout}>
           Logout
         </button>
         <p className="text-muted" style={{ fontSize: 12, marginTop: "var(--space-sm)", textAlign: "center" }}>
