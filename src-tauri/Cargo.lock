@@ -3580,6 +3580,7 @@ dependencies = [
  "tauri-plugin-store",
  "tokio",
  "tokio-tungstenite",
+ "uuid",
 ]
 
 [[package]]
