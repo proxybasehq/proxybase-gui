@@ -207,8 +207,8 @@ export default function MarketPage() {
                 </table>
                 <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl)</div>
                 <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
-                  onClick={() => copyToClipboard(`curl --socks5 ${PROXY_ADDRESS} --proxy-user ${(connectModal as any).session_id}:${token} http://api.proxybase.xyz/v2/ip`, "Example")}>
-                  curl --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  http://api.proxybase.xyz/v2/ip
+                  onClick={() => copyToClipboard(`${navigator.platform.includes("Win") ? "curl.exe" : "curl"} --socks5 ${PROXY_ADDRESS} --proxy-user ${(connectModal as any).session_id}:${token} http://api.proxybase.xyz/v2/ip`, "Example")}>
+                  {navigator.platform.includes("Win") ? "curl.exe" : "curl"} --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  http://api.proxybase.xyz/v2/ip
                   {copied === "Example" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
                 </pre>
               </>
@@ -229,8 +229,8 @@ export default function MarketPage() {
                   <>
                     <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl • local)</div>
                     <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
-                      onClick={() => copyToClipboard(`curl --socks5 127.0.0.1:${bridgePorts[(connectModal as any).session_id]} http://api.proxybase.xyz/v2/ip`, "Example (local)")}>
-                      curl --socks5 127.0.0.1:{bridgePorts[(connectModal as any).session_id]} http://api.proxybase.xyz/v2/ip
+                      onClick={() => copyToClipboard(`${navigator.platform.includes("Win") ? "curl.exe" : "curl"} --socks5 127.0.0.1:${bridgePorts[(connectModal as any).session_id]} http://api.proxybase.xyz/v2/ip`, "Example (local)")}>
+                      {navigator.platform.includes("Win") ? "curl.exe" : "curl"} --socks5 127.0.0.1:{bridgePorts[(connectModal as any).session_id]} http://api.proxybase.xyz/v2/ip
                       {copied === "Example (local)" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
                     </pre>
                   </>

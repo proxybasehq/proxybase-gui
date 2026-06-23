@@ -204,8 +204,6 @@ async fn relay_through_upstream(
 async fn accept_socks5_noauth(
     client: &mut tokio::net::TcpStream,
 ) -> Result<(String, u16), String> {
-    use tokio::io::AsyncReadExt;
-
     let mut buf = [0u8; 3];
     client
         .read_exact(&mut buf)
@@ -242,7 +240,7 @@ async fn accept_socks5_noauth(
         return Err("not CONNECT".to_string());
     }
 
-    let (host, port) = match hdr[3] {
+    let host = match hdr[3] {
         0x01 => {
             // IPv4
             let mut ip = [0u8; 4];
@@ -250,8 +248,7 @@ async fn accept_socks5_noauth(
                 .read_exact(&mut ip)
                 .await
                 .map_err(|e| format!("read ipv4: {}", e))?;
-            let ip = std::net::Ipv4Addr::from(ip);
-            (ip.to_string(), 0u16)
+            std::net::Ipv4Addr::from(ip).to_string()
         }
         0x03 => {
             // Domain name
@@ -265,10 +262,7 @@ async fn accept_socks5_noauth(
                 .read_exact(&mut domain)
                 .await
                 .map_err(|e| format!("read domain: {}", e))?;
-            (
-                String::from_utf8_lossy(&domain).to_string(),
-                0u16,
-            )
+            String::from_utf8_lossy(&domain).to_string()
         }
         0x04 => {
             // IPv6
@@ -277,8 +271,7 @@ async fn accept_socks5_noauth(
                 .read_exact(&mut ip)
                 .await
                 .map_err(|e| format!("read ipv6: {}", e))?;
-            let ip = std::net::Ipv6Addr::from(ip);
-            (ip.to_string(), 0u16)
+            std::net::Ipv6Addr::from(ip).to_string()
         }
         _ => return Err("unsupported address type".to_string()),
     };

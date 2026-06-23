@@ -56,7 +56,7 @@ const faqs = [
   },
   {
     q: "How do I use the SOCKS5 proxy after buying a session?",
-    a: `Click a session row in the Active Sessions tab to see connection details. Configure your application to use a SOCKS5 proxy at ${PROXY_ADDRESS} with the session ID as username and your session token as password. Example: curl --socks5 ${PROXY_ADDRESS} --proxy-user SESSION_ID:TOKEN https://example.com`,
+    a: `Click a session row in the Active Sessions tab to see connection details. Configure your application to use a SOCKS5 proxy at ${PROXY_ADDRESS} with the session ID as username and your session token as password. Example: curl.exe --socks5 ${PROXY_ADDRESS} --proxy-user SESSION_ID:TOKEN https://example.com (use curl on macOS/Linux)`,
   },
   {
     q: "What happens to my sessions when I log out?",

@@ -1,5 +1,5 @@
 mod api;
-mod bridge;
+pub mod bridge;
 mod commands;
 mod seller;
 
