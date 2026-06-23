@@ -14,8 +14,9 @@ pub async fn bridge_start(
     upstream_addr: String,
     upstream_username: String,
     upstream_password: String,
+    preferred_port: Option<u16>,
 ) -> Result<u16, String> {
-    start_bridge(session_id, upstream_addr, upstream_username, upstream_password).await
+    start_bridge(session_id, upstream_addr, upstream_username, upstream_password, preferred_port).await
 }
 
 #[tauri::command]
@@ -46,14 +47,24 @@ pub async fn start_bridge(
     upstream_addr: String,
     upstream_username: String,
     upstream_password: String,
+    preferred_port: Option<u16>,
 ) -> Result<u16, String> {
     // Stop existing bridge for this session if any
     stop_bridge(&session_id).await;
 
-    // Bind to port 0 to get a random available port
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .map_err(|e| format!("Failed to bind bridge listener: {}", e))?;
+    // Try preferred port first, fall back to random
+    let listener = if let Some(port) = preferred_port {
+        match TcpListener::bind(format!("127.0.0.1:{}", port)).await {
+            Ok(l) => l,
+            Err(_) => TcpListener::bind("127.0.0.1:0")
+                .await
+                .map_err(|e| format!("Failed to bind bridge listener: {}", e))?,
+        }
+    } else {
+        TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(|e| format!("Failed to bind bridge listener: {}", e))?
+    };
     let local_port = listener
         .local_addr()
         .map_err(|e| format!("Failed to get local addr: {}", e))?

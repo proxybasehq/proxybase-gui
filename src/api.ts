@@ -168,12 +168,14 @@ export async function bridgeStart(
   upstreamAddr: string,
   upstreamUsername: string,
   upstreamPassword: string,
+  preferredPort?: number,
 ): Promise<number> {
   return invoke("bridge_start", {
     sessionId,
     upstreamAddr,
     upstreamUsername,
     upstreamPassword,
+    preferredPort: preferredPort ?? null,
   });
 }
 

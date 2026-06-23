@@ -98,6 +98,7 @@ async fn test_bridge_full_flow() {
         format!("127.0.0.1:{}", upstream_port),
         "myuser".to_string(),
         "mypass".to_string(),
+        None,
     )
     .await
     .expect("bridge should start");
@@ -166,6 +167,7 @@ async fn test_bridge_start_stop() {
         format!("127.0.0.1:{}", upstream_port),
         "u".to_string(),
         "p".to_string(),
+        None,
     )
     .await
     .unwrap();

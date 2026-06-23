@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useOutletContext, Navigate } from "react-router-dom";
 import { listPricing, createSession, closeSession, listSessions, getToken, bridgeStart, bridgeStop } from "../api";
+import { load } from "@tauri-apps/plugin-store";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
 import { formatUsdPerGb, PROXY_ADDRESS } from "../utils";
@@ -66,10 +67,59 @@ export default function MarketPage() {
     setPricesLoading(false);
   }
 
+  async function saveBridgePorts(ports: Record<string, number>) {
+    try {
+      const store = await load("proxybase-settings.json");
+      await store.set("bridge_ports", ports);
+    } catch (_) {}
+  }
+
+  async function loadBridgePorts(): Promise<Record<string, number>> {
+    try {
+      const store = await load("proxybase-settings.json");
+      return await store.get<Record<string, number>>("bridge_ports") || {};
+    } catch (_) { return {}; }
+  }
+
   async function fetchSessions() {
     try {
       const r = await listSessions(backendUrl);
-      setSessions((r as any).sessions || []);
+      const active: Array<Record<string, unknown>> = (r as any).sessions || [];
+      setSessions(active);
+
+      // Restart local bridges for sessions that lost state after app restart
+      let t = token;
+      if (!t) {
+        t = await getToken().catch(() => "");
+        if (t) setToken(t);
+      }
+      if (t) {
+        const savedPorts = await loadBridgePorts();
+        const activeIds = new Set(active.map((s) => (s as any).session_id).filter(Boolean));
+        const newPorts: Record<string, number> = {};
+
+        for (const sid of activeIds) {
+          if (!bridgePorts[sid as string]) {
+            try {
+              const preferred = savedPorts[sid as string] || undefined;
+              const port = await bridgeStart(sid as string, PROXY_ADDRESS, sid as string, t, preferred);
+              newPorts[sid as string] = port;
+            } catch (_) { /* bridge start is best-effort */ }
+          } else {
+            newPorts[sid as string] = bridgePorts[sid as string];
+          }
+        }
+
+        setBridgePorts(newPorts);
+        saveBridgePorts(newPorts);
+
+        // Stop bridges for sessions no longer active
+        for (const sid of Object.keys(savedPorts)) {
+          if (!activeIds.has(sid)) {
+            await bridgeStop(sid).catch(() => {});
+          }
+        }
+      }
     } catch (_) { /* ignore */ }
   }
 
@@ -82,7 +132,12 @@ export default function MarketPage() {
     try {
       await closeSession(backendUrl, sessionId);
       await bridgeStop(sessionId);
-      setBridgePorts((prev) => { const next = { ...prev }; delete next[sessionId]; return next; });
+      setBridgePorts((prev) => {
+        const next = { ...prev };
+        delete next[sessionId];
+        saveBridgePorts(next);
+        return next;
+      });
       await fetchSessions();
     } catch (e) { setError(String(e)); }
     setClosingId(null);
@@ -99,7 +154,11 @@ export default function MarketPage() {
       if (sid && token) {
         try {
           const port = await bridgeStart(sid, PROXY_ADDRESS, sid, token);
-          setBridgePorts((prev) => ({ ...prev, [sid]: port }));
+          setBridgePorts((prev) => {
+            const next = { ...prev, [sid]: port };
+            saveBridgePorts(next);
+            return next;
+          });
         } catch (_) { /* bridge start is best-effort */ }
       }
       await fetchSessions();
