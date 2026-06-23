@@ -1,4 +1,5 @@
 mod api;
+mod bridge;
 mod commands;
 mod seller;
 
@@ -99,6 +100,9 @@ pub fn run() {
             commands::list_payouts,
             seller::start_seller,
             seller::stop_seller,
+            bridge::bridge_start,
+            bridge::bridge_stop,
+            bridge::bridge_port,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

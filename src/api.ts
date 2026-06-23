@@ -160,3 +160,27 @@ export async function listDeposits(backendUrl: string): Promise<Record<string, u
 export async function listPayouts(backendUrl: string): Promise<Record<string, unknown>> {
   return invoke("list_payouts", { backendUrl });
 }
+
+// ---- Bridge ----
+
+export async function bridgeStart(
+  sessionId: string,
+  upstreamAddr: string,
+  upstreamUsername: string,
+  upstreamPassword: string,
+): Promise<number> {
+  return invoke("bridge_start", {
+    sessionId,
+    upstreamAddr,
+    upstreamUsername,
+    upstreamPassword,
+  });
+}
+
+export async function bridgeStop(sessionId: string): Promise<void> {
+  return invoke("bridge_stop", { sessionId });
+}
+
+export async function bridgePort(sessionId: string): Promise<number | null> {
+  return invoke("bridge_port", { sessionId });
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext, Navigate } from "react-router-dom";
-import { listPricing, createSession, closeSession, listSessions, getToken } from "../api";
+import { listPricing, createSession, closeSession, listSessions, getToken, bridgeStart, bridgeStop } from "../api";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
 import { formatUsdPerGb, PROXY_ADDRESS } from "../utils";
@@ -51,13 +51,18 @@ export default function MarketPage() {
   const [sessions, setSessions] = useState<Array<Record<string, unknown>>>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [connectModal, setConnectModal] = useState<Record<string, unknown> | null>(null);
+  const [connectTab, setConnectTab] = useState<"remote" | "local">("remote");
+  const [bridgePorts, setBridgePorts] = useState<Record<string, number>>({});
   const [token, setToken] = useState("");
 
   async function fetchPrices() {
     setError("");
     setPricesLoading(true);
-    try { setAllPricing(((await listPricing(backendUrl)) as any).pricing || []); }
-    catch (e) { setError(String(e)); }
+    fetchSessions(); // refresh sessions in background
+    try {
+      const r = await listPricing(backendUrl);
+      setAllPricing(((r as any).pricing || []));
+    } catch (e) { setError(String(e)); }
     setPricesLoading(false);
   }
 
@@ -76,7 +81,9 @@ export default function MarketPage() {
     setClosingId(sessionId);
     try {
       await closeSession(backendUrl, sessionId);
-      await fetchSessions(); // refresh from backend — only active sessions are returned
+      await bridgeStop(sessionId);
+      setBridgePorts((prev) => { const next = { ...prev }; delete next[sessionId]; return next; });
+      await fetchSessions();
     } catch (e) { setError(String(e)); }
     setClosingId(null);
   }
@@ -87,7 +94,14 @@ export default function MarketPage() {
     const key = `${country}:${networkType}`;
     setPriceBuyLoading(key);
     try {
-      await createSession(backendUrl, country, networkType, "rotating", null);
+      const session = await createSession(backendUrl, country, networkType, "rotating", null);
+      const sid = (session as any).session_id;
+      if (sid && token) {
+        try {
+          const port = await bridgeStart(sid, PROXY_ADDRESS, sid, token);
+          setBridgePorts((prev) => ({ ...prev, [sid]: port }));
+        } catch (_) { /* bridge start is best-effort */ }
+      }
       await fetchSessions();
       setActiveTab("sessions");
     } catch (e) {
@@ -106,7 +120,8 @@ export default function MarketPage() {
 
   useEffect(() => { fetchToken(); }, []);
   useEffect(() => {
-    if (activeTab === "sessions") fetchSessions();
+    // Always refresh sessions to keep the list accurate
+    fetchSessions();
     if (activeTab === "prices") fetchPrices();
   }, [activeTab]);
 
@@ -168,23 +183,66 @@ export default function MarketPage() {
           onClick={() => setConnectModal(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="card-title">Proxy Connection Details</div>
-            <table style={{ marginTop: "var(--space-sm)" }}>
-              <tbody>
-                {copyTr({ label: "Proxy Address", value: PROXY_ADDRESS })}
-                {copyTr({ label: "Username", value: (connectModal as any).session_id })}
-                {copyTr({ label: "Session ID", value: (connectModal as any).session_id })}
-                {copyTr({ label: "Password", value: token.slice(0, 20) + "...", full: token })}
-                {copyTr({ label: "Country", value: (connectModal as any).country })}
-                {copyTr({ label: "Type", value: (connectModal as any).network_type || (connectModal as any).proxy_category })}
-              </tbody>
-            </table>
-            <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl)</div>
-            <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
-              onClick={() => copyToClipboard(`curl --socks5 ${PROXY_ADDRESS} --proxy-user ${(connectModal as any).session_id}:${token} http://api.proxybase.xyz/v2/ip`, "Example")}>
-              curl --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  http://api.proxybase.xyz/v2/ip
-              {copied === "Example" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
-            </pre>
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setConnectModal(null)}>Close</button>
+
+            <div className="tabs" style={{ marginTop: "var(--space-sm)" }}>
+              <button className={`tab ${connectTab === "remote" ? "active" : ""}`} onClick={() => setConnectTab("remote")}>
+                Remote
+              </button>
+              <button className={`tab ${connectTab === "local" ? "active" : ""}`} onClick={() => setConnectTab("local")}>
+                Local Bridge
+              </button>
+            </div>
+
+            {connectTab === "remote" && (
+              <>
+                <table style={{ marginTop: "var(--space-sm)" }}>
+                  <tbody>
+                    {copyTr({ label: "Proxy Address", value: PROXY_ADDRESS })}
+                    {copyTr({ label: "Username", value: (connectModal as any).session_id })}
+                    {copyTr({ label: "Session ID", value: (connectModal as any).session_id })}
+                    {copyTr({ label: "Password", value: token.slice(0, 20) + "...", full: token })}
+                    {copyTr({ label: "Country", value: (connectModal as any).country })}
+                    {copyTr({ label: "Type", value: (connectModal as any).network_type || (connectModal as any).proxy_category })}
+                  </tbody>
+                </table>
+                <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl)</div>
+                <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
+                  onClick={() => copyToClipboard(`curl --socks5 ${PROXY_ADDRESS} --proxy-user ${(connectModal as any).session_id}:${token} http://api.proxybase.xyz/v2/ip`, "Example")}>
+                  curl --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  http://api.proxybase.xyz/v2/ip
+                  {copied === "Example" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
+                </pre>
+              </>
+            )}
+
+            {connectTab === "local" && (
+              <>
+                <p style={{ fontSize: 12, color: "var(--color-body)", marginTop: "var(--space-sm)" }}>
+                  Use the local bridge for apps like Chrome that don't support authenticated proxies.
+                </p>
+                <table style={{ marginTop: "var(--space-sm)" }}>
+                  <tbody>
+                    {copyTr({ label: "Proxy Address", value: "127.0.0.1:" + (bridgePorts[(connectModal as any).session_id] || "?") })}
+                    {copyTr({ label: "Auth", value: "None required" })}
+                  </tbody>
+                </table>
+                {bridgePorts[(connectModal as any).session_id] ? (
+                  <>
+                    <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl • local)</div>
+                    <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
+                      onClick={() => copyToClipboard(`curl --socks5 127.0.0.1:${bridgePorts[(connectModal as any).session_id]} http://api.proxybase.xyz/v2/ip`, "Example (local)")}>
+                      curl --socks5 127.0.0.1:{bridgePorts[(connectModal as any).session_id]} http://api.proxybase.xyz/v2/ip
+                      {copied === "Example (local)" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
+                    </pre>
+                  </>
+                ) : (
+                  <p className="text-muted" style={{ fontSize: 11, marginTop: "var(--space-md)" }}>
+                    Bridge not running. The session may have been bought from another device.
+                  </p>
+                )}
+              </>
+            )}
+
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-md)", width: "100%" }} onClick={() => setConnectModal(null)}>Close</button>
           </div>
         </div>
       )}
