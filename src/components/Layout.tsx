@@ -163,6 +163,7 @@ export default function Layout() {
       const store = await load("proxybase-settings.json");
       await store.set("seller_config", { upstreams, includeDirect });
       await store.set("seller_running", true);
+      await store.save();
     } catch (_) { /* ignore */ }
   }
 
@@ -172,6 +173,7 @@ export default function Layout() {
     try {
       const store = await load("proxybase-settings.json");
       await store.set("seller_running", false);
+      await store.save();
     } catch (_) { /* ignore */ }
   }
 
@@ -213,7 +215,7 @@ export default function Layout() {
 
   async function handleLogout() {
     if (sellerRunning) { try { await apiStopSeller(); } catch (_) {} }
-    try { const store = await load("proxybase-settings.json"); await store.set("seller_running", false); } catch (_) {}
+    try { const store = await load("proxybase-settings.json"); await store.set("seller_running", false); await store.save(); } catch (_) {}
     try {
       const r = await listSessions(backendUrl);
       const sessions = (r as any).sessions || [];

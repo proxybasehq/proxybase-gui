@@ -71,6 +71,7 @@ export default function MarketPage() {
     try {
       const store = await load("proxybase-settings.json");
       await store.set("bridge_ports", ports);
+      await store.save();
     } catch (_) {}
   }
 
@@ -81,7 +82,7 @@ export default function MarketPage() {
     } catch (_) { return {}; }
   }
 
-  async function fetchSessions() {
+  async function fetchSessions(currentPorts?: Record<string, number>) {
     try {
       const r = await listSessions(backendUrl);
       const active: Array<Record<string, unknown>> = (r as any).sessions || [];
@@ -96,22 +97,23 @@ export default function MarketPage() {
       if (t) {
         const savedPorts = await loadBridgePorts();
         const activeIds = new Set(active.map((s) => (s as any).session_id).filter(Boolean));
+        const portsSource = currentPorts || bridgePorts;
         const newPorts: Record<string, number> = {};
 
         for (const sid of activeIds) {
-          if (!bridgePorts[sid as string]) {
+          if (!portsSource[sid as string]) {
             try {
               const preferred = savedPorts[sid as string] || undefined;
               const port = await bridgeStart(sid as string, PROXY_ADDRESS, sid as string, t, preferred);
               newPorts[sid as string] = port;
             } catch (_) { /* bridge start is best-effort */ }
           } else {
-            newPorts[sid as string] = bridgePorts[sid as string];
+            newPorts[sid as string] = portsSource[sid as string];
           }
         }
 
         setBridgePorts(newPorts);
-        saveBridgePorts(newPorts);
+        await saveBridgePorts(newPorts);
 
         // Stop bridges for sessions no longer active
         for (const sid of Object.keys(savedPorts)) {
@@ -132,13 +134,11 @@ export default function MarketPage() {
     try {
       await closeSession(backendUrl, sessionId);
       await bridgeStop(sessionId);
-      setBridgePorts((prev) => {
-        const next = { ...prev };
-        delete next[sessionId];
-        saveBridgePorts(next);
-        return next;
-      });
-      await fetchSessions();
+      const nextPorts = { ...bridgePorts };
+      delete nextPorts[sessionId];
+      setBridgePorts(nextPorts);
+      await saveBridgePorts(nextPorts);
+      await fetchSessions(nextPorts);
     } catch (e) { setError(String(e)); }
     setClosingId(null);
   }
@@ -154,14 +154,16 @@ export default function MarketPage() {
       if (sid && token) {
         try {
           const port = await bridgeStart(sid, PROXY_ADDRESS, sid, token);
-          setBridgePorts((prev) => {
-            const next = { ...prev, [sid]: port };
-            saveBridgePorts(next);
-            return next;
-          });
-        } catch (_) { /* bridge start is best-effort */ }
+          const nextPorts = { ...bridgePorts, [sid]: port };
+          setBridgePorts(nextPorts);
+          await saveBridgePorts(nextPorts);
+          await fetchSessions(nextPorts);
+        } catch (_) {
+          await fetchSessions();
+        }
+      } else {
+        await fetchSessions();
       }
-      await fetchSessions();
       setActiveTab("sessions");
     } catch (e) {
       const msg = String(e).toLowerCase();
@@ -357,7 +359,7 @@ export default function MarketPage() {
         <div className="card">
           <div className="flex justify-between items-center">
             <div className="card-title" style={{ marginBottom: 0 }}>Active Sessions ({sessions.length})</div>
-            <button className="btn btn-sm btn-secondary" onClick={fetchSessions}>Refresh</button>
+            <button className="btn btn-sm btn-secondary" onClick={() => fetchSessions()}>Refresh</button>
           </div>
           {sessions.length === 0 ? (
             <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>No active sessions. Buy one from the Prices tab.</p>
