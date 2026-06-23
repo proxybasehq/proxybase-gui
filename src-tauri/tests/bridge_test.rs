@@ -14,10 +14,10 @@ async fn fake_socks5_server() -> u16 {
             };
 
             tokio::spawn(async move {
-                let mut buf = [0u8; 3];
-                if stream.read_exact(&mut buf).await.is_err() { return; }
-                if buf[0] != 0x05 { return; }
-                let n = buf[1] as usize;
+                let mut greeting_hdr = [0u8; 2];
+                if stream.read_exact(&mut greeting_hdr).await.is_err() { return; }
+                if greeting_hdr[0] != 0x05 { return; }
+                let n = greeting_hdr[1] as usize;
                 let mut methods = vec![0u8; n];
                 if n > 0 { let _ = stream.read_exact(&mut methods).await; }
 

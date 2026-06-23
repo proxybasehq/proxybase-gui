@@ -204,16 +204,16 @@ async fn relay_through_upstream(
 async fn accept_socks5_noauth(
     client: &mut tokio::net::TcpStream,
 ) -> Result<(String, u16), String> {
-    let mut buf = [0u8; 3];
+    let mut greeting_hdr = [0u8; 2];
     client
-        .read_exact(&mut buf)
+        .read_exact(&mut greeting_hdr)
         .await
-        .map_err(|e| format!("read greeting: {}", e))?;
+        .map_err(|e| format!("read greeting header: {}", e))?;
 
-    if buf[0] != 0x05 {
+    if greeting_hdr[0] != 0x05 {
         return Err("not SOCKS5".to_string());
     }
-    let nmethods = buf[1] as usize;
+    let nmethods = greeting_hdr[1] as usize;
 
     let mut methods = vec![0u8; nmethods];
     if nmethods > 0 {
