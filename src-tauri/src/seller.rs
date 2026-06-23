@@ -162,8 +162,8 @@ async fn run_stream_relay(
     let tx2 = relay_tx.clone();
     let sid2 = sid.clone();
 
-    // TCP reads → WS relay_response
-    let tcp_to_ws = tokio::spawn(async move {
+    // Race TCP→WS and WS→TCP via tokio::select! to prevent CLOSE_WAIT leaks.
+    let tcp_to_ws = async {
         let mut buf = vec![0u8; 8192];
         loop {
             match tokio::io::AsyncReadExt::read(&mut tcp_r, &mut buf).await {
@@ -185,18 +185,23 @@ async fn run_stream_relay(
                 Err(_) => break,
             }
         }
-    });
+    };
 
-    // WS relay_data → TCP writes
-    while let Some(data) = tcp_rx.recv().await {
-        if tokio::io::AsyncWriteExt::write_all(&mut tcp_w, &data)
-            .await
-            .is_err()
-        {
-            break;
+    let ws_to_tcp = async {
+        while let Some(data) = tcp_rx.recv().await {
+            if tokio::io::AsyncWriteExt::write_all(&mut tcp_w, &data)
+                .await
+                .is_err()
+            {
+                break;
+            }
         }
+    };
+
+    tokio::select! {
+        _ = tcp_to_ws => {}
+        _ = ws_to_tcp => {}
     }
-    tcp_to_ws.abort();
 }
 
 // ---------------------------------------------------------------------------
