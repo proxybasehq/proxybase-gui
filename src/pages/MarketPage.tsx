@@ -186,6 +186,54 @@ export default function MarketPage() {
     if (activeTab === "prices") fetchPrices();
   }, [activeTab]);
 
+  // SSE Real-time Updates
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let active = true;
+
+    async function setupSse() {
+      try {
+        const token = await getToken();
+        if (!active) return;
+        
+        const url = `${backendUrl}/v2/events?token=${encodeURIComponent(token)}`;
+        console.log("[SSE] Connecting to", url);
+        
+        es = new EventSource(url);
+        
+        es.onmessage = (e) => {
+          try {
+            const evt = JSON.parse(e.data);
+            console.log("[SSE] Message received:", evt);
+            if (evt.event === "PricingUpdate" || evt.event === "SellerPoolUpdate") {
+              fetchPrices();
+            }
+            if (evt.event === "SessionUpdate") {
+              fetchSessions();
+            }
+          } catch (err) {
+            console.error("[SSE] Failed to parse message:", err);
+          }
+        };
+
+        es.onerror = (e) => {
+          console.error("[SSE] Connection error:", e);
+        };
+      } catch (err) {
+        console.error("[SSE] Setup failed:", err);
+      }
+    }
+
+    setupSse();
+
+    return () => {
+      active = false;
+      if (es) {
+        es.close();
+      }
+    };
+  }, [backendUrl]);
+
   // Auto-switch to Prices when all sessions are closed
   useEffect(() => {
     if (sessions.length === 0 && activeTab === "sessions") {
