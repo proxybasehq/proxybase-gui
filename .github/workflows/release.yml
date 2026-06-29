@@ -50,6 +50,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-14' && 'x86_64-apple-darwin,aarch64-apple-darwin' || '' }}
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
@@ -61,23 +63,32 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build release bundles
+        if: matrix.os != 'macos-14'
         run: pnpm tauri build -- --locked
+
+      - name: Build release bundles (macOS universal)
+        if: matrix.os == 'macos-14'
+        run: pnpm tauri build --target universal-apple-darwin -- --locked
 
       - name: Collect release artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          find src-tauri/target/release/bundle -type f \( \
-            -name '*.dmg' -o \
-            -name '*.app.tar.gz' -o \
-            -name '*.msi' -o \
-            -name '*.exe' -o \
-            -name '*.deb' -o \
-            -name '*.rpm' -o \
-            -name '*.AppImage' -o \
-            -name '*.tar.gz' \
-          \) -exec cp {} dist/ \;
+          for dir in src-tauri/target/release/bundle src-tauri/target/universal-apple-darwin/release/bundle; do
+            if [ -d "$dir" ]; then
+              find "$dir" -type f \( \
+                -name '*.dmg' -o \
+                -name '*.app.tar.gz' -o \
+                -name '*.msi' -o \
+                -name '*.exe' -o \
+                -name '*.deb' -o \
+                -name '*.rpm' -o \
+                -name '*.AppImage' -o \
+                -name '*.tar.gz' \
+              \) -exec cp {} dist/ \;
+            fi
+          done
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
