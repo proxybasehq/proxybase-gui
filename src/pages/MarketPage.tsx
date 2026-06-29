@@ -315,7 +315,12 @@ export default function MarketPage() {
             <div className="card-title" style={{ marginBottom: 0 }}>Pricing</div>
             <button className="btn btn-sm btn-secondary" onClick={fetchPrices} disabled={pricesLoading}>Refresh</button>
           </div>
-          {availablePrices.length > 0 ? (
+          {pricesLoading && allPricing.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "var(--space-xl) 0" }}>
+              <div className="welcome-loader" />
+              <p className="text-muted" style={{ marginTop: "var(--space-md)", fontSize: 13 }}>Loading pricing data...</p>
+            </div>
+          ) : availablePrices.length > 0 ? (
             <div className="table-container" style={{ marginTop: "var(--space-sm)" }}>
               <table>
                 <thead><tr><th>Country</th><th>Category</th><th>Price</th><th style={{ width: 80 }}></th></tr></thead>

@@ -391,7 +391,7 @@ async fn try_single_path_connection(
 
     let upstream_owned = upstream.cloned();
     let mut ping_tick = interval(Duration::from_secs(30));
-    let mut heartbeat_tick = interval(Duration::from_secs(60));
+    let mut heartbeat_tick = interval(Duration::from_secs(30));
     let mut stream_count: u32 = 0;
 
     loop {
