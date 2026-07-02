@@ -316,4 +316,22 @@ impl BackendClient {
             .context("Failed to fetch sessions")?;
         response_json(resp).await
     }
+
+    /// POST /v2/sessions/{id}/keepalive — touch session to prevent idle timeout.
+    pub async fn keepalive_session(&self, session_id: &str) -> Result<()> {
+        let resp = self
+            .http
+            .post(format!("{}/v2/sessions/{}/keepalive", self.base_url, session_id))
+            .header("Authorization", self.bearer())
+            .send()
+            .await
+            .context("Failed to send keepalive")?;
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("keepalive failed ({}): {}", status, body)
+        }
+    }
 }

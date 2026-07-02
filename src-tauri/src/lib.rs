@@ -94,6 +94,7 @@ pub fn run() {
             commands::create_session,
             commands::close_session,
             commands::list_sessions,
+            commands::keepalive_session,
             commands::list_deposits,
             commands::get_token,
             commands::logout,

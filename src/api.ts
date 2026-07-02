@@ -149,6 +149,10 @@ export async function closeSession(
   return invoke("close_session", { backendUrl, sessionId });
 }
 
+export async function keepaliveSession(backendUrl: string, sessionId: string): Promise<void> {
+  return invoke("keepalive_session", { backendUrl, sessionId });
+}
+
 export async function listSessions(backendUrl: string): Promise<Record<string, unknown>> {
   return invoke("list_sessions", { backendUrl });
 }

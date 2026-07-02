@@ -296,6 +296,12 @@ pub async fn list_sessions(backend_url: String) -> Result<serde_json::Value, Str
     call_api!(&backend_url, client, client.list_sessions())
 }
 
+#[tauri::command]
+pub async fn keepalive_session(backend_url: String, session_id: String) -> Result<(), String> {
+    let client = BackendClient::new(&backend_url);
+    client.keepalive_session(&session_id).await.map_err(|e| e.to_string())
+}
+
 // ---------------------------------------------------------------------------
 // Session token
 // ---------------------------------------------------------------------------

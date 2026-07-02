@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext, Navigate } from "react-router-dom";
-import { listPricing, createSession, closeSession, listSessions, getToken, bridgeStart, bridgeStop } from "../api";
+import { listPricing, createSession, closeSession, listSessions, keepaliveSession, getToken, bridgeStart, bridgeStop } from "../api";
 import { load } from "@tauri-apps/plugin-store";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
@@ -82,6 +82,45 @@ export default function MarketPage() {
     } catch (_) { return {}; }
   }
 
+  // ── Stable port registry: country:type → port ──
+  const PORT_REGISTRY_KEY = "port_registry";
+  let nextPort = 10800;
+
+  async function loadPortRegistry(): Promise<Record<string, number>> {
+    try {
+      const store = await load("proxybase-settings.json");
+      const registry = await store.get<Record<string, number>>(PORT_REGISTRY_KEY) || {};
+      // Find highest port to continue from
+      for (const p of Object.values(registry)) { if (p >= nextPort) nextPort = p + 1; }
+      return registry;
+    } catch (_) { return {}; }
+  }
+
+  async function savePortRegistry(registry: Record<string, number>) {
+    try {
+      const store = await load("proxybase-settings.json");
+      await store.set(PORT_REGISTRY_KEY, registry);
+      await store.save();
+    } catch (_) {}
+  }
+
+  // ── Session keepalive timer (every 5 minutes) ──
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const r = await listSessions(backendUrl);
+        const active: Array<Record<string, unknown>> = (r as any).sessions || [];
+        for (const s of active) {
+          const sid = (s as any).session_id;
+          if (sid) {
+            keepaliveSession(backendUrl, sid as string).catch(() => {});
+          }
+        }
+      } catch (_) {}
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [backendUrl]);
+
   async function fetchSessions(currentPorts?: Record<string, number>) {
     try {
       const r = await listSessions(backendUrl);
@@ -100,12 +139,24 @@ export default function MarketPage() {
         const portsSource = currentPorts || bridgePorts;
         const newPorts: Record<string, number> = {};
 
+        // Load stable port registry for country:type → port mapping
+        const portRegistry = await loadPortRegistry();
+
         for (const sid of activeIds) {
           if (!portsSource[sid as string]) {
             try {
-              const preferred = savedPorts[sid as string] || undefined;
+              // Prefer stable port from registry (country:type), fall back to session-specific
+              const session = active.find((s) => (s as any).session_id === sid);
+              const countryType = session ? `${(session as any).country}:${(session as any).network_type}` : null;
+              const preferred = (countryType ? portRegistry[countryType] : undefined)
+                || savedPorts[sid as string]
+                || undefined;
               const port = await bridgeStart(sid as string, PROXY_ADDRESS, sid as string, t, preferred);
               newPorts[sid as string] = port;
+              // Update port registry
+              if (countryType) {
+                portRegistry[countryType] = port;
+              }
             } catch (_) { /* bridge start is best-effort */ }
           } else {
             newPorts[sid as string] = portsSource[sid as string];
@@ -114,6 +165,7 @@ export default function MarketPage() {
 
         setBridgePorts(newPorts);
         await saveBridgePorts(newPorts);
+        await savePortRegistry(portRegistry);
 
         // Stop bridges for sessions no longer active
         for (const sid of Object.keys(savedPorts)) {
@@ -146,14 +198,25 @@ export default function MarketPage() {
   async function handleBuyFromPrice(country: string, networkType: string) {
     setError("");
     setInsufficientFunds(false);
-    const key = `${country}:${networkType}`;
-    setPriceBuyLoading(key);
+    const countryTypeKey = `${country}:${networkType}`;
+    setPriceBuyLoading(countryTypeKey);
     try {
       const session = await createSession(backendUrl, country, networkType, "rotating", null);
       const sid = (session as any).session_id;
       if (sid && token) {
         try {
-          const port = await bridgeStart(sid, PROXY_ADDRESS, sid, token);
+          // Stable port: reuse port from registry or allocate next
+          const portRegistry = await loadPortRegistry();
+          const preferredPort = portRegistry[countryTypeKey] || nextPort;
+          if (!portRegistry[countryTypeKey]) {
+            portRegistry[countryTypeKey] = preferredPort;
+            nextPort += 1;
+            await savePortRegistry(portRegistry);
+          }
+          const port = await bridgeStart(sid, PROXY_ADDRESS, sid, token, preferredPort);
+          // Update registry with actual port assigned
+          portRegistry[countryTypeKey] = port;
+          await savePortRegistry(portRegistry);
           const nextPorts = { ...bridgePorts, [sid]: port };
           setBridgePorts(nextPorts);
           await saveBridgePorts(nextPorts);
