@@ -52,19 +52,20 @@ pub async fn start_bridge(
     // Stop existing bridge for this session if any
     stop_bridge(&session_id).await;
 
-    // Try preferred port first, fall back to random
-    let listener = if let Some(port) = preferred_port {
-        match TcpListener::bind(format!("127.0.0.1:{}", port)).await {
-            Ok(l) => l,
-            Err(_) => TcpListener::bind("127.0.0.1:0")
-                .await
-                .map_err(|e| format!("Failed to bind bridge listener: {}", e))?,
-        }
+    // Also reclaim the preferred port from any other bridge that may hold it
+    if let Some(port) = preferred_port {
+        stop_bridge_on_port(port).await;
+    }
+
+    // Bind to preferred port strictly — never fall back to random
+    let bind_addr = if let Some(port) = preferred_port {
+        format!("127.0.0.1:{}", port)
     } else {
-        TcpListener::bind("127.0.0.1:0")
-            .await
-            .map_err(|e| format!("Failed to bind bridge listener: {}", e))?
+        "127.0.0.1:0".to_string()
     };
+    let listener = TcpListener::bind(&bind_addr)
+        .await
+        .map_err(|e| format!("Failed to bind bridge on {}: {}", bind_addr, e))?;
     let local_port = listener
         .local_addr()
         .map_err(|e| format!("Failed to get local addr: {}", e))?
@@ -125,6 +126,23 @@ pub async fn stop_bridge(session_id: &str) {
     if let Some(bridge) = bridges.remove(session_id) {
         let _ = bridge.shutdown_tx.send(());
         eprintln!("[bridge {}] Stop signal sent", session_id);
+    }
+}
+
+/// Stop any bridge currently listening on the given local port,
+/// regardless of which session owns it. Used to reclaim a port
+/// before starting a new bridge that needs the same port.
+pub async fn stop_bridge_on_port(port: u16) {
+    let mut bridges = BRIDGES.lock().await;
+    let sid = bridges
+        .iter()
+        .find(|(_, b)| b.local_port == port)
+        .map(|(k, _)| k.clone());
+    if let Some(sid) = sid {
+        if let Some(bridge) = bridges.remove(&sid) {
+            let _ = bridge.shutdown_tx.send(());
+            eprintln!("[bridge {}] Stopped (port {} reclaimed)", sid, port);
+        }
     }
 }
 
