@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 // ---------------------------------------------------------------------------
 // HTTP API client
@@ -41,8 +42,14 @@ pub struct VerifyResponse {
 
 impl BackendClient {
     pub fn new(base_url: &str) -> Self {
+        let http = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
+            .user_agent(concat!("ProxyBase/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
         Self {
-            http: reqwest::Client::new(),
+            http,
             base_url: base_url.trim_end_matches('/').to_string(),
             token: Self::load_token(),
         }
@@ -62,10 +69,7 @@ impl BackendClient {
     }
 
     fn token_path() -> std::path::PathBuf {
-        dirs::home_dir()
-            .unwrap_or_default()
-            .join(".proxybase")
-            .join("session_token")
+        crate::proxybase_dir().join("session_token")
     }
 
     fn load_token() -> Option<String> {
@@ -98,13 +102,14 @@ impl BackendClient {
     // --- Auth ---
 
     pub async fn auth_challenge(&self, wallet_address: &str) -> Result<ChallengeResponse> {
+        let url = format!("{}/v2/auth/challenge", self.base_url);
         let resp = self
             .http
-            .post(format!("{}/v2/auth/challenge", self.base_url))
+            .post(&url)
             .json(&serde_json::json!({"wallet_address": wallet_address}))
             .send()
             .await
-            .context("Failed to request auth challenge")?;
+            .with_context(|| format!("Failed to POST {}", url))?;
         let json = response_json(resp).await?;
         serde_json::from_value(json).context("Failed to parse challenge response")
     }

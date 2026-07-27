@@ -4,14 +4,46 @@ mod commands;
 mod seller;
 
 use seller::SellerState;
+use std::path::PathBuf;
+use std::sync::OnceLock;
+
+#[cfg(desktop)]
 use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 
+static PROXYBASE_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Ensure the OnceLock is set (first call wins). Returns the resolved path.
+pub fn ensure_proxybase_dir(app_handle: &tauri::AppHandle) -> PathBuf {
+    let dir = app_handle
+        .path()
+        .app_data_dir()
+        .or_else(|_| app_handle.path().app_config_dir())
+        .unwrap_or_default()
+        .join(".proxybase");
+    let _ = PROXYBASE_DIR.set(dir);
+    PROXYBASE_DIR.get().cloned().unwrap()
+}
+
+/// Get the proxybase data directory. On desktop falls back to `~/.proxybase`
+/// if not yet initialised; on mobile, `ensure_proxybase_dir` must be called first.
+pub fn proxybase_dir() -> PathBuf {
+    PROXYBASE_DIR
+        .get()
+        .cloned()
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".proxybase"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    let builder = builder
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_store::Builder::default().build());
+
+    #[cfg(desktop)]
+    let builder = builder
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(
             #[cfg(target_os = "macos")]
@@ -19,60 +51,64 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             tauri_plugin_autostart::MacosLauncher::default(),
             None::<Vec<&str>>,
-        ))
-        .manage(SellerState::new())
-        .setup(|app| {
-            use std::sync::atomic::{AtomicBool, Ordering};
-            use std::sync::Arc;
+        ));
 
+    builder
+        .manage(SellerState::new())
+        .setup(|_app| {
             // Hide from dock on macOS
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            _app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            let window_visible = Arc::new(AtomicBool::new(false));
+            #[cfg(desktop)]
+            {
+                use std::sync::atomic::{AtomicBool, Ordering};
+                use std::sync::Arc;
 
-            // ---- Tray icon: toggle window on click ----
-            let vis = window_visible.clone();
-            let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .show_menu_on_left_click(false)
-                .on_tray_icon_event(move |tray, event| {
-                    // Keep positioner plugin in sync with tray position
-                    let app = tray.app_handle();
-                    tauri_plugin_positioner::on_tray_event(app, &event);
-                    if let tauri::tray::TrayIconEvent::Click { button_state, .. } = event {
-                        if button_state != tauri::tray::MouseButtonState::Up {
-                            return;
-                        }
-                        if let Some(window) = app.get_webview_window("main") {
-                            if vis.fetch_xor(true, Ordering::SeqCst) {
-                                let _ = window.hide();
-                            } else {
-                                use tauri_plugin_positioner::{Position, WindowExt};
-                                #[cfg(target_os = "macos")]
-                                let _ = window.move_window_constrained(Position::TrayBottomCenter);
-                                #[cfg(not(target_os = "macos"))]
-                                let _ = window.move_window_constrained(Position::TrayCenter);
-                                let _ = window.show();
-                                let _ = window.set_focus();
+                let window_visible = Arc::new(AtomicBool::new(false));
+
+                // ---- Tray icon: toggle window on click ----
+                let vis = window_visible.clone();
+                let _tray = TrayIconBuilder::new()
+                    .icon(_app.default_window_icon().unwrap().clone())
+                    .show_menu_on_left_click(false)
+                    .on_tray_icon_event(move |tray, event| {
+                        let app = tray.app_handle();
+                        tauri_plugin_positioner::on_tray_event(app, &event);
+                        if let tauri::tray::TrayIconEvent::Click { button_state, .. } = event {
+                            if button_state != tauri::tray::MouseButtonState::Up {
+                                return;
+                            }
+                            if let Some(window) = app.get_webview_window("main") {
+                                if vis.fetch_xor(true, Ordering::SeqCst) {
+                                    let _ = window.hide();
+                                } else {
+                                    use tauri_plugin_positioner::{Position, WindowExt};
+                                    #[cfg(target_os = "macos")]
+                                    let _ = window.move_window_constrained(Position::TrayBottomCenter);
+                                    #[cfg(not(target_os = "macos"))]
+                                    let _ = window.move_window_constrained(Position::TrayCenter);
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
                             }
                         }
-                    }
-                })
-                .build(app)
-                .expect("failed to build tray icon");
+                    })
+                    .build(app)
+                    .expect("failed to build tray icon");
 
-            // Hide instead of close — so closing the window sends it to tray
-            if let Some(window) = app.get_webview_window("main") {
-                let vis = window_visible.clone();
-                let w = window.clone();
-                window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        vis.store(false, Ordering::SeqCst);
-                        let _ = w.hide();
-                        api.prevent_close();
-                    }
-                });
+                // Hide instead of close — so closing the window sends it to tray
+                if let Some(window) = app.get_webview_window("main") {
+                    let vis = window_visible.clone();
+                    let w = window.clone();
+                    window.on_window_event(move |event| {
+                        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                            vis.store(false, Ordering::SeqCst);
+                            let _ = w.hide();
+                            api.prevent_close();
+                        }
+                    });
+                }
             }
 
             Ok(())

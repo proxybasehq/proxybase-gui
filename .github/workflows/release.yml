@@ -10,7 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  # ---- Desktop builds (unchanged) ----
+  build-desktop:
     name: Bundle (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -97,12 +98,103 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  # ---- Android build ----
+  build-android:
+    name: Bundle (Android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout proxybase-gui
+        uses: actions/checkout@v4
+
+      - name: Checkout libproxybase
+        uses: actions/checkout@v4
+        with:
+          repository: proxybasehq/libproxybase
+          path: ../libproxybase
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager "ndk;27.0.11902837"
+
+      - name: Add NDK toolchain to PATH
+        run: echo "$ANDROID_HOME/ndk/27.0.11902837/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust with Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> src-tauri/target
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Android APK
+        run: pnpm tauri android build
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.11902837
+
+      - name: Sign APK
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" > src-tauri/gen/android/release.jks.b64
+          base64 -d src-tauri/gen/android/release.jks.b64 > src-tauri/gen/android/release.jks
+          ${{ env.ANDROID_HOME }}/build-tools/36.0.0/apksigner sign \
+            --ks src-tauri/gen/android/release.jks \
+            --ks-key-alias ${{ secrets.ANDROID_KEY_ALIAS }} \
+            --ks-pass pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+            --key-pass pass:${{ secrets.ANDROID_KEY_PASSWORD }} \
+            --out src-tauri/gen/android/app/build/outputs/apk/universal/release/proxybase-android-signed.apk \
+            src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Rename APK
+        run: |
+          mv src-tauri/gen/android/app/build/outputs/apk/universal/release/proxybase-android-signed.apk \
+             src-tauri/gen/android/app/build/outputs/apk/universal/release/proxybase-android-v${{ steps.version.outputs.version }}.apk
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles-android
+          path: src-tauri/gen/android/app/build/outputs/apk/universal/release/proxybase-android-v${{ steps.version.outputs.version }}.apk
+          if-no-files-found: error
+
+  # ---- Publish all bundles ----
   publish:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build-desktop, build-android]
     steps:
-      - name: Download bundle artifacts
+      - name: Download desktop artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist

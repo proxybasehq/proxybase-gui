@@ -138,7 +138,7 @@ export default function Layout() {
       setSellerConnected(true); setSellerRunning(true); setSellerError("");
     }).then((fn) => unlistens.push(fn));
     listen<string>("seller:disconnected", () => {
-      setSellerConnected(false); setSellerRunning(false); setSellerStreams([]);
+      setSellerConnected(false); setSellerRunning(false); setSellerStreams([]); setSellerError("");
     }).then((fn) => unlistens.push(fn));
     listen<string>("seller:error", (event) => {
       setSellerError(event.payload); setSellerRunning(false); setSellerConnected(false); setSellerStreams([]);

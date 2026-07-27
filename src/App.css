@@ -78,7 +78,7 @@ html, body, #root {
 }
 
 .app-header {
-  height: var(--header-height);
+  height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
   flex-shrink: 0;
   background: var(--color-canvas);
   border-bottom: 1px solid var(--color-hairline);
@@ -86,6 +86,7 @@ html, body, #root {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-md);
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .app-header-logo {
@@ -116,7 +117,7 @@ html, body, #root {
 
 /* ---- Bottom Navigation ---- */
 .bottom-nav {
-  height: var(--nav-height);
+  height: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
   flex-shrink: 0;
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
@@ -125,7 +126,6 @@ html, body, #root {
   justify-content: space-around;
   padding: 0 var(--space-xs);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  overflow: hidden;
 }
 
 .bottom-nav-item {
@@ -151,12 +151,12 @@ html, body, #root {
 }
 
 .bottom-nav-item svg {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .bottom-nav-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.2px;
 }

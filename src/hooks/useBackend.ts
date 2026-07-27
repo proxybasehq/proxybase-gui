@@ -1,9 +1,15 @@
 import { useState, useCallback } from "react";
 
 const STORAGE_KEY = "proxybase_backend_url";
-const DEFAULT_BACKEND = import.meta.env.DEV
-  ? "http://localhost:8080"
-  : "https://api.proxybase.xyz";
+
+function getDefaultBackend(): string {
+  if (!import.meta.env.DEV) {
+    return "https://api.proxybase.xyz";
+  }
+  return "http://localhost:8080";
+}
+
+const DEFAULT_BACKEND = getDefaultBackend();
 
 export function useBackend() {
   const [backendUrl, setBackendUrl] = useState<string>(() => {

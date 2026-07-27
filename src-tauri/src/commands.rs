@@ -31,12 +31,6 @@ pub struct LoginResult {
 // Helpers (must be defined before use by commands)
 // ---------------------------------------------------------------------------
 
-fn wallet_dir() -> std::path::PathBuf {
-    dirs::home_dir()
-        .unwrap_or_default()
-        .join(".proxybase")
-}
-
 fn require_auth(client: &BackendClient) -> Result<(), String> {
     if !client.is_authenticated() {
         Err("Not authenticated. Please login first.".to_string())
@@ -47,7 +41,7 @@ fn require_auth(client: &BackendClient) -> Result<(), String> {
 
 /// Silently re-authenticate using the on-disk wallet (no password).
 pub(crate) async fn reauth(backend_url: &str) -> Result<(), String> {
-    let data_dir = wallet_dir();
+    let data_dir = crate::proxybase_dir();
     let mut wm =
         libproxybase::WalletManager::new(data_dir).map_err(|e| e.to_string())?;
     wm.load("").map_err(|e| format!("Failed to load wallet: {}", e))?;
@@ -107,8 +101,11 @@ macro_rules! call_api {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub fn wallet_create(password: String) -> Result<CreateWalletResult, String> {
-    let data_dir = wallet_dir();
+pub fn wallet_create(
+    app_handle: tauri::AppHandle,
+    password: String,
+) -> Result<CreateWalletResult, String> {
+    let data_dir = crate::ensure_proxybase_dir(&app_handle);
     let mut wm = libproxybase::WalletManager::new(data_dir).map_err(|e| e.to_string())?;
     let mnemonic = wm
         .create(if password.is_empty() { "" } else { &password })
@@ -118,8 +115,12 @@ pub fn wallet_create(password: String) -> Result<CreateWalletResult, String> {
 }
 
 #[tauri::command]
-pub fn wallet_import(phrase: String, password: String) -> Result<WalletInfo, String> {
-    let data_dir = wallet_dir();
+pub fn wallet_import(
+    app_handle: tauri::AppHandle,
+    phrase: String,
+    password: String,
+) -> Result<WalletInfo, String> {
+    let data_dir = crate::ensure_proxybase_dir(&app_handle);
     let mut wm = libproxybase::WalletManager::new(data_dir).map_err(|e| e.to_string())?;
     wm.import(
         &phrase,
@@ -133,8 +134,8 @@ pub fn wallet_import(phrase: String, password: String) -> Result<WalletInfo, Str
 }
 
 #[tauri::command]
-pub fn wallet_info() -> Result<WalletInfo, String> {
-    let data_dir = wallet_dir();
+pub fn wallet_info(app_handle: tauri::AppHandle) -> Result<WalletInfo, String> {
+    let data_dir = crate::ensure_proxybase_dir(&app_handle);
     let mut wm = libproxybase::WalletManager::new(data_dir).map_err(|e| e.to_string())?;
     match wm.load("") {
         Ok(()) => Ok(WalletInfo {
@@ -154,10 +155,11 @@ pub fn wallet_info() -> Result<WalletInfo, String> {
 
 #[tauri::command]
 pub async fn login(
+    app_handle: tauri::AppHandle,
     backend_url: String,
     password: String,
 ) -> Result<LoginResult, String> {
-    let data_dir = wallet_dir();
+    let data_dir = crate::ensure_proxybase_dir(&app_handle);
     let mut wm = libproxybase::WalletManager::new(data_dir).map_err(|e| e.to_string())?;
     wm.load(if password.is_empty() { "" } else { &password })
         .map_err(|e| format!("Failed to load wallet: {}", e))?;
@@ -307,11 +309,8 @@ pub async fn keepalive_session(backend_url: String, session_id: String) -> Resul
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub fn get_token() -> Result<String, String> {
-    let path = dirs::home_dir()
-        .unwrap_or_default()
-        .join(".proxybase")
-        .join("session_token");
+pub fn get_token(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let path = crate::ensure_proxybase_dir(&app_handle).join("session_token");
     std::fs::read_to_string(&path).map_err(|e| format!("No session token: {}", e))
 }
 
@@ -320,11 +319,8 @@ pub fn get_token() -> Result<String, String> {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub fn logout() -> Result<(), String> {
-    let path = dirs::home_dir()
-        .unwrap_or_default()
-        .join(".proxybase")
-        .join("session_token");
+pub fn logout(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let path = crate::ensure_proxybase_dir(&app_handle).join("session_token");
     if path.exists() {
         std::fs::remove_file(&path).map_err(|e| format!("Failed to logout: {}", e))?;
     }

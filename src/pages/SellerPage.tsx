@@ -83,7 +83,7 @@ export default function SellerPage() {
           </div>
         </div>
         {statusError && <div className="alert alert-error mt-md">{statusError}</div>}
-        {seller.error && <div className="alert alert-error mt-md">{seller.error}</div>}
+        {seller.running && seller.error && <div className="alert alert-error mt-md">{seller.error}</div>}
         {startError && <div className="alert alert-error mt-md">{startError}</div>}
         <div className="flex gap-sm mt-md">
           <button className="btn btn-secondary btn-sm" onClick={handleStatus} disabled={statusLoading}>

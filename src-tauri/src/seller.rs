@@ -1,13 +1,11 @@
 use crate::api::BackendClient;
 use anyhow::Result;
-use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::io::Write;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::mpsc;
-use tokio::sync::Mutex as TokioMutex;
-use tokio::time::{interval, Duration};
+use tokio::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 
 // ---------------------------------------------------------------------------
@@ -99,8 +97,8 @@ fn base64_decode(encoded: &str) -> Option<Vec<u8>> {
 
 async fn run_stream_relay(
     app_handle: AppHandle,
-    target_dest: &str, // domain/IP for SOCKS5 routing
-    target_ip: &str,   // IP for direct TCP
+    target_dest: &str,
+    target_ip: &str,
     target_port: u16,
     upstream: Option<&UpstreamProxy>,
     relay_tx: &mpsc::UnboundedSender<Message>,
@@ -162,7 +160,6 @@ async fn run_stream_relay(
     let tx2 = relay_tx.clone();
     let sid2 = sid.clone();
 
-    // Race TCP→WS and WS→TCP via tokio::select! to prevent CLOSE_WAIT leaks.
     let tcp_to_ws = async {
         let mut buf = vec![0u8; 8192];
         loop {
@@ -176,7 +173,7 @@ async fn run_stream_relay(
                         "data": enc
                     });
                     if tx2
-                        .send(Message::Text(serde_json::to_string(&m).unwrap_or_default()))
+                        .send(Message::Text(serde_json::to_string(&m).unwrap_or_default().into()))
                         .is_err()
                     {
                         break;
@@ -205,10 +202,21 @@ async fn run_stream_relay(
 }
 
 // ---------------------------------------------------------------------------
-// Seller: per-path WebSocket connections (mirrors CLI)
+// Seller: per-path WebSocket connections
 // ---------------------------------------------------------------------------
 
-/// Build the list of paths: direct (None) + each upstream proxy.
+fn percent_encode(s: &str) -> String {
+    s.bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
+                format!("{}", b as char)
+            } else {
+                format!("%{:02X}", b)
+            }
+        })
+        .collect()
+}
+
 fn build_paths(
     upstreams: &[UpstreamProxy],
     include_direct: bool,
@@ -242,7 +250,6 @@ pub async fn run_seller_ws_loop(
         format!("Starting {} path(s): {:?}", paths.len(), path_ids),
     );
 
-    // Spawn one connection per path — each runs independently with its own reconnect loop
     let mut handles = Vec::new();
     for (path_id, upstream) in paths {
         let app = app_handle.clone();
@@ -257,10 +264,8 @@ pub async fn run_seller_ws_loop(
         ));
     }
 
-    // Wait for shutdown signal
     let _ = &mut shutdown_rx;
 
-    // Drain handles: send shutdown to all, then await all
     let (senders, joins): (Vec<_>, Vec<_>) = handles.into_iter().unzip();
     for tx in senders {
         let _ = tx.send(());
@@ -272,7 +277,6 @@ pub async fn run_seller_ws_loop(
     Ok(())
 }
 
-/// Single-path WebSocket connection loop with auto-reconnect and re-auth.
 async fn run_single_path_loop(
     app_handle: AppHandle,
     backend_url: &str,
@@ -283,21 +287,30 @@ async fn run_single_path_loop(
     let upstream_owned = upstream.cloned();
     let pid = path_id.to_string();
     let mut backoff_secs = 1u64;
+    let shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     loop {
-        // Always rebuild WS URL with fresh token from disk
         let client = BackendClient::new(backend_url);
         let token = client.token().unwrap_or("").to_string();
         let ws_base = backend_url
             .replace("https://", "wss://")
             .replace("http://", "ws://");
-        let ws_url = format!("{}/v2/ws/seller?token={}", ws_base, token);
+        let ws_url = format!(
+            "{}/v2/ws/seller?token={}",
+            ws_base,
+            percent_encode(&token)
+        );
 
         let app = app_handle.clone();
         let up = upstream_owned.clone();
         let p = pid.clone();
+        let flag = shutdown_flag.clone();
 
-        match try_single_path_connection(app.clone(), &ws_url, &token, &p, up.as_ref()).await {
+        match try_single_path_connection(
+            app.clone(), &ws_url, &token, &p, up.as_ref(), flag,
+        )
+        .await
+        {
             Ok(()) => {
                 backoff_secs = 1;
                 let _ = app.emit(
@@ -332,9 +345,9 @@ async fn run_single_path_loop(
             }
         }
 
-        // Check for shutdown between reconnects
         tokio::select! {
             _ = &mut shutdown_rx => {
+                shutdown_flag.store(true, std::sync::atomic::Ordering::Relaxed);
                 return;
             }
             _ = tokio::time::sleep(Duration::from_millis(100)) => {}
@@ -342,178 +355,387 @@ async fn run_single_path_loop(
     }
 }
 
-/// Establish one WebSocket connection for a single path and relay until disconnect.
+// ---------------------------------------------------------------------------
+// Raw WebSocket connection (no tungstenite — works around Android handshake bug)
+// ---------------------------------------------------------------------------
+
+/// Write a masked WebSocket text frame to a TCP stream.
+fn ws_write_text(tcp: &mut std::net::TcpStream, payload: &str) -> std::io::Result<()> {
+    let len = payload.len();
+    let mut header = vec![0x81u8]; // FIN + text opcode
+    if len < 126 {
+        header.push((len as u8) | 0x80);
+    } else if len <= 0xFFFF {
+        header.push(126u8 | 0x80);
+        header.extend_from_slice(&(len as u16).to_be_bytes());
+    } else {
+        header.push(127u8 | 0x80);
+        header.extend_from_slice(&(len as u64).to_be_bytes());
+    }
+    let mask: [u8; 4] = rand::random();
+    header.extend_from_slice(&mask);
+    let masked: Vec<u8> = payload
+        .as_bytes()
+        .iter()
+        .enumerate()
+        .map(|(i, b)| b ^ mask[i % 4])
+        .collect();
+    header.extend_from_slice(&masked);
+    tcp.write_all(&header)
+}
+
+/// Write a masked WebSocket ping frame (empty payload).
+fn ws_write_ping(tcp: &mut std::net::TcpStream) -> std::io::Result<()> {
+    let mask: [u8; 4] = rand::random();
+    let frame = [0x89u8, 0x80, mask[0], mask[1], mask[2], mask[3]];
+    tcp.write_all(&frame)
+}
+
+/// Write a masked WebSocket pong frame.
+fn ws_write_pong(tcp: &mut std::net::TcpStream, payload: &[u8]) -> std::io::Result<()> {
+    let len = payload.len();
+    let mut header = vec![0x8Au8]; // FIN + pong opcode
+    if len < 126 {
+        header.push((len as u8) | 0x80);
+    } else if len <= 0xFFFF {
+        header.push(126u8 | 0x80);
+        header.extend_from_slice(&(len as u16).to_be_bytes());
+    } else {
+        header.push(127u8 | 0x80);
+        header.extend_from_slice(&(len as u64).to_be_bytes());
+    }
+    let mask: [u8; 4] = rand::random();
+    header.extend_from_slice(&mask);
+    let masked: Vec<u8> = payload
+        .iter()
+        .enumerate()
+        .map(|(i, b)| b ^ mask[i % 4])
+        .collect();
+    header.extend_from_slice(&masked);
+    tcp.write_all(&header)
+}
+
+/// Try to extract a complete WebSocket frame from `buf`.
+/// Returns `Some((payload, opcode, remaining))` if a frame was parsed,
+/// or `None` if more data is needed.
+fn ws_parse_frame(buf: &[u8]) -> Option<(Vec<u8>, u8, &[u8])> {
+    if buf.len() < 2 {
+        return None;
+    }
+    let opcode = buf[0] & 0x0F;
+    let masked = (buf[1] & 0x80) != 0;
+    let mut len = (buf[1] & 0x7F) as usize;
+    let mut pos = 2;
+
+    if len == 126 {
+        if buf.len() < 4 { return None; }
+        len = u16::from_be_bytes([buf[2], buf[3]]) as usize;
+        pos = 4;
+    } else if len == 127 {
+        if buf.len() < 10 { return None; }
+        len = u64::from_be_bytes([
+            buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9],
+        ]) as usize;
+        pos = 10;
+    }
+
+    let mask_key_pos = pos;
+    if masked {
+        pos += 4;
+    }
+    let payload_end = pos + len;
+    if buf.len() < payload_end {
+        return None;
+    }
+
+    let mut payload = Vec::from(&buf[pos..payload_end]);
+    if masked {
+        let mk = &buf[mask_key_pos..mask_key_pos + 4];
+        for (i, b) in payload.iter_mut().enumerate() {
+            *b ^= mk[i % 4];
+        }
+    }
+
+    Some((payload, opcode, &buf[payload_end..]))
+}
+
 async fn try_single_path_connection(
     app_handle: AppHandle,
     ws_url: &str,
     token: &str,
     path_id: &str,
     upstream: Option<&UpstreamProxy>,
+    shutdown: Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<(), String> {
-    let (ws, _resp) = tokio_tungstenite::connect_async(ws_url)
-        .await
-        .map_err(|e| format!("Failed to connect: {}", e))?;
+    if token.is_empty() {
+        return Err("No session token — please login first.".to_string());
+    }
 
-    let conn_id = uuid::Uuid::new_v4().to_string();
-    let _ = app_handle.emit(
-        "seller:connected",
-        format!("[{}] Connected (conn={})", path_id, &conn_id[..8]),
-    );
+    let url = ws_url.to_string();
+    let t = token.to_string();
+    let pid = path_id.to_string();
+    let app = app_handle.clone();
+    let up_cloned = upstream.cloned();
 
-    let (mut ws_sink, mut ws_stream) = ws.split();
+    // Channel for relay responses → raw WS text frames
+    let (ws_write_tx, ws_write_rx) = std::sync::mpsc::channel::<String>();
 
-    // Send auth token as first message (required by backend WS listener)
-    ws_sink
-        .send(Message::Text(token.to_string()))
-        .await
-        .map_err(|e| format!("Failed to send auth token: {}", e))?;
+    let (done_tx, done_rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
+    let shutdown_flag = shutdown.clone();
+    std::thread::spawn(move || {
+        let result = (|| -> Result<(), String> {
+        use std::collections::HashMap;
+        use std::io::{BufRead, Read, Write};
+        use std::net::TcpStream;
+        use std::sync::atomic::Ordering;
+        use std::sync::Mutex;
+        use std::time::Instant;
 
-    // Send path_info to identify this connection's path
-    let path_info = serde_json::json!({"type": "path_info", "path_id": path_id});
-    ws_sink
-        .send(Message::Text(
-            serde_json::to_string(&path_info).unwrap_or_default(),
-        ))
-        .await
-        .map_err(|e| format!("Failed to send path_info: {}", e))?;
+        // Parse URL
+        let without_scheme = url
+            .strip_prefix("ws://")
+            .or_else(|| url.strip_prefix("wss://"))
+            .ok_or_else(|| format!("Invalid WS URL: {}", url))?;
+        let slash = without_scheme.find('/').unwrap_or(without_scheme.len());
+        let hp = &without_scheme[..slash];
+        let pq = if slash < without_scheme.len() {
+            &without_scheme[slash..]
+        } else {
+            "/"
+        };
+        let (host, port) = hp.split_once(':').map_or((hp, 8080u16), |(h, p)| {
+            (h, p.parse::<u16>().unwrap_or(8080))
+        });
 
-    let (relay_tx, mut relay_rx) = mpsc::unbounded_channel::<Message>();
-    let active: Arc<TokioMutex<HashMap<String, mpsc::UnboundedSender<Vec<u8>>>>> =
-        Arc::new(TokioMutex::new(HashMap::new()));
+        // TCP connect + WebSocket handshake
+        let addr = format!("{}:{}", host, port);
+        let mut tcp =
+            TcpStream::connect(&addr).map_err(|e| format!("TCP {}: {}", addr, e))?;
 
-    let relay_drain = tokio::spawn(async move {
-        while let Some(msg) = relay_rx.recv().await {
-            if ws_sink.send(msg).await.is_err() {
+        let key_bytes: [u8; 16] = rand::random();
+        let key = base64_encode(&key_bytes);
+        let req = format!(
+            "GET {} HTTP/1.1\r\nHost: {}:{}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {}\r\n\r\n",
+            pq, host, port, key
+        );
+        tcp.write_all(req.as_bytes())
+            .map_err(|e| format!("Write upgrade: {}", e))?;
+
+        // Read response
+        let mut reader = std::io::BufReader::new(&mut tcp);
+        let mut status = String::new();
+        reader.read_line(&mut status).map_err(|e| format!("Read status: {}", e))?;
+        let mut headers = String::new();
+        loop {
+            let mut line = String::new();
+            reader.read_line(&mut line).map_err(|e| format!("Read header: {}", e))?;
+            if line == "\r\n" || line == "\n" || line.is_empty() {
                 break;
             }
+            headers.push_str(&line);
         }
-    });
+        if !status.contains("101") {
+            return Err(format!("Expected 101, got: {} | {}", status.trim(), headers.trim()));
+        }
+        drop(reader);
 
-    let upstream_owned = upstream.cloned();
-    let mut ping_tick = interval(Duration::from_secs(30));
-    let mut heartbeat_tick = interval(Duration::from_secs(30));
-    let mut stream_count: u32 = 0;
+        let _ = app.emit("seller:connected", format!("[{}] Connected (raw WS)", pid));
 
-    loop {
-        tokio::select! {
-            _ = ping_tick.tick() => {
-                let _ = relay_tx.send(Message::Ping(vec![].into()));
+        // Auth + path_info
+        ws_write_text(&mut tcp, &t).map_err(|e| format!("Send auth: {}", e))?;
+        let path_info = serde_json::json!({"type": "path_info", "path_id": &pid});
+        ws_write_text(&mut tcp, &serde_json::to_string(&path_info).unwrap_or_default())
+            .map_err(|e| format!("Send path_info: {}", e))?;
+
+        tcp.set_nonblocking(true).map_err(|e| e.to_string())?;
+
+        let active: Arc<Mutex<HashMap<String, std::sync::mpsc::Sender<Vec<u8>>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let mut stream_count: u32 = 0;
+        let mut last_ping = Instant::now();
+        let mut last_hb = Instant::now();
+        let mut read_buf = Vec::new();
+        let mut frame_buf = vec![0u8; 65536];
+
+        loop {
+            if shutdown_flag.load(Ordering::Relaxed) {
+                return Ok(());
             }
-            _ = heartbeat_tick.tick() => {
+
+            // Drain write channel
+            while let Ok(msg) = ws_write_rx.try_recv() {
+                let _ = ws_write_text(&mut tcp, &msg);
+            }
+
+            // Timers
+            if last_ping.elapsed() >= std::time::Duration::from_secs(30) {
+                let _ = ws_write_ping(&mut tcp);
+                last_ping = Instant::now();
+            }
+            if last_hb.elapsed() >= std::time::Duration::from_secs(30) {
                 let hb = serde_json::json!({
                     "type": "heartbeat",
                     "active_streams": stream_count,
                     "version": "0.1.0",
-                    "conn_id": conn_id,
                 });
-                let _ = relay_tx.send(Message::Text(serde_json::to_string(&hb).unwrap_or_default()));
+                let _ = ws_write_text(
+                    &mut tcp,
+                    &serde_json::to_string(&hb).unwrap_or_default(),
+                );
+                last_hb = Instant::now();
             }
-            msg = ws_stream.next() => {
-                match msg {
-                    Some(Ok(Message::Ping(d))) => {
-                        let _ = relay_tx.send(Message::Pong(d));
-                    }
-                    Some(Ok(Message::Pong(_))) => {}
-                    Some(Ok(Message::Text(text))) => {
-                        if let Ok(p) = serde_json::from_str::<serde_json::Value>(&text) {
-                            // Detect auth-token rejection from the server
-                            if p.get("error").and_then(|v| v.as_str()) == Some("invalid_token") {
-                                relay_drain.abort();
-                                return Err("AUTH_EXPIRED".to_string());
-                            }
-                            match p.get("type").and_then(|v| v.as_str()) {
-                                Some("relay_data") => {
-                                    if let Some(enc) = p.get("data").and_then(|v| v.as_str()) {
-                                        if let Some(dec) = base64_decode(enc) {
-                                            let streams = active.lock().await;
-                                            let sid = p.get("session_id")
-                                                .and_then(|v| v.as_str())
-                                                .unwrap_or("");
-                                            if let Some(s) = streams.get(sid) {
-                                                let _ = s.send(dec);
-                                            } else {
-                                                for (_, s) in streams.iter() {
-                                                    let _ = s.send(dec.clone());
-                                                    break;
-                                                }
+
+            // Read
+            match tcp.read(&mut frame_buf) {
+                Ok(0) => return Ok(()),
+                Ok(n) => read_buf.extend_from_slice(&frame_buf[..n]),
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    // Continue to parse what we already have
+                }
+                Err(e) => return Err(format!("TCP read: {}", e)),
+            }
+
+            // Parse frames from accumulated buffer (every iteration, not just WouldBlock)
+            while let Some((payload, opcode, remaining)) = ws_parse_frame(&read_buf) {
+                read_buf = remaining.to_vec();
+                match opcode {
+                    0x1 => {
+                        // Text frame
+                        let text = String::from_utf8_lossy(&payload);
+                        let p: serde_json::Value = match serde_json::from_str(&text) {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        if p.get("error").and_then(|v| v.as_str()) == Some("invalid_token") {
+                            return Err("AUTH_EXPIRED".to_string());
+                        }
+                        match p.get("type").and_then(|v| v.as_str()) {
+                            Some("relay_data") => {
+                                if let Some(enc) = p.get("data").and_then(|v| v.as_str()) {
+                                    if let Some(dec) = base64_decode(enc) {
+                                        let streams = active.lock().unwrap();
+                                        let sid = p
+                                            .get("session_id")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("");
+                                        if let Some(s) = streams.get(sid) {
+                                            let _ = s.send(dec);
+                                        } else {
+                                            for (_, s) in streams.iter() {
+                                                let _ = s.send(dec.clone());
+                                                break;
                                             }
                                         }
                                     }
                                 }
-                                Some("stream_open") => {
-                                    let sid = p.get("session_id")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("?")
-                                        .to_string();
-                                    let tip = p.get("target_ip")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("127.0.0.1")
-                                        .to_string();
-                                    let tport = p.get("target_port")
-                                        .and_then(|v| v.as_u64())
-                                        .unwrap_or(443) as u16;
-                                    let thost = p.get("target_host")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string());
-                                    let dest = thost.unwrap_or_else(|| tip.clone());
+                            }
+                            Some("stream_open") => {
+                                let sid = p
+                                    .get("session_id")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("?")
+                                    .to_string();
+                                let tip = p
+                                    .get("target_ip")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("127.0.0.1")
+                                    .to_string();
+                                let tport = p
+                                    .get("target_port")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(443) as u16;
+                                let thost = p
+                                    .get("target_host")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string());
+                                let dest = thost.unwrap_or_else(|| tip.clone());
+                                stream_count += 1;
 
-                                    let streams = active.clone();
-                                    let tx = relay_tx.clone();
-                                    let up = upstream_owned.clone();
-                                    stream_count += 1;
+                                let (tcp_tx, tcp_rx) =
+                                    std::sync::mpsc::channel::<Vec<u8>>();
+                                active.lock().unwrap().insert(sid.clone(), tcp_tx);
 
-                                    let (tcp_tx, tcp_rx) =
-                                        mpsc::unbounded_channel::<Vec<u8>>();
-                                    streams.lock().await.insert(sid.clone(), tcp_tx);
-
-                                    // Don't emit stream-open for QoS probes — they're transient
-                                    if !sid.starts_with("probe_") {
-                                        let _ = app_handle.emit("seller:stream-open", StreamEvent {
+                                if !sid.starts_with("probe_") {
+                                    let _ = app.emit(
+                                        "seller:stream-open",
+                                        StreamEvent {
                                             session_id: sid.clone(),
                                             target_ip: tip.clone(),
                                             target_port: tport,
                                             route_index: None,
-                                        });
-                                    }
+                                        },
+                                    );
+                                }
 
-                                    let app_handle2 = app_handle.clone();
-                                    let sid2 = sid.clone();
-                                    tokio::spawn(async move {
+                                // Bridge std → tokio channel for run_stream_relay
+                                let (tokio_tx, tokio_rx) =
+                                    mpsc::unbounded_channel::<Vec<u8>>();
+                                std::thread::spawn(move || {
+                                    while let Ok(data) = tcp_rx.recv() {
+                                        if tokio_tx.send(data).is_err() {
+                                            break;
+                                        }
+                                    }
+                                });
+
+                                // Relay output → ws_write_tx
+                                let (relay_tx, mut relay_drain) =
+                                    mpsc::unbounded_channel::<Message>();
+                                let ws_out = ws_write_tx.clone();
+                                std::thread::spawn(move || {
+                                    while let Some(msg) = relay_drain.blocking_recv() {
+                                        if let Message::Text(t) = msg {
+                                            if ws_out.send(t.to_string()).is_err() {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                });
+
+                                let app2 = app.clone();
+                                let up = up_cloned.clone();
+                                let sid2 = sid.clone();
+                                let active2 = active.clone();
+                                std::thread::spawn(move || {
+                                    let rt = tokio::runtime::Builder::new_current_thread()
+                                        .enable_io()
+                                        .enable_time()
+                                        .build()
+                                        .unwrap();
+                                    let app_emit = app2.clone();
+                                    rt.block_on(async {
                                         let up_ref: Option<&UpstreamProxy> = up.as_ref();
                                         run_stream_relay(
-                                            app_handle2.clone(),
-                                            &dest,
-                                            &tip,
-                                            tport,
-                                            up_ref,
-                                            &tx,
-                                            tcp_rx,
-                                            &sid2,
+                                            app2, &dest, &tip, tport, up_ref,
+                                            &relay_tx, tokio_rx, &sid2,
                                         )
                                         .await;
-                                        streams.lock().await.remove(&sid2);
+                                        active2.lock().unwrap().remove(&sid2);
                                         if !sid2.starts_with("probe_") {
-                                            let _ = app_handle2.emit("seller:stream-closed", &sid2);
+                                            let _ = app_emit
+                                                .emit("seller:stream-closed", &sid2);
                                         }
                                     });
-                                }
-                                _ => {}
+                                });
                             }
+                            _ => {}
                         }
                     }
-                    Some(Ok(Message::Close(_))) | None => {
-                        relay_drain.abort();
-                        return Ok(());
+                    0x8 => return Ok(()), // Close
+                    0x9 => {
+                        // Ping → Pong
+                        let _ = ws_write_pong(&mut tcp, &payload);
                     }
-                    Some(Err(e)) => {
-                        relay_drain.abort();
-                        return Err(format!("WS error: {}", e));
-                    }
-                    _ => {}
+                    _ => {} // Pong (0xA) and others ignored
                 }
             }
         }
-    }
+        })();
+        let _ = done_tx.send(result);
+    });
+
+    done_rx.await.map_err(|_| "WS thread panicked".to_string())?
 }
 
 // ---------------------------------------------------------------------------
@@ -533,7 +755,6 @@ pub async fn start_seller(
 
     let (tx, rx) = tokio::sync::oneshot::channel();
 
-    // Store shutdown handle
     {
         let mut shutdown = state.shutdown_tx.lock().map_err(|e| e.to_string())?;
         *shutdown = Some(tx);
