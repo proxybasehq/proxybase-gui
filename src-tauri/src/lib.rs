@@ -94,11 +94,11 @@ pub fn run() {
                             }
                         }
                     })
-                    .build(app)
+                    .build(_app)
                     .expect("failed to build tray icon");
 
                 // Hide instead of close — so closing the window sends it to tray
-                if let Some(window) = app.get_webview_window("main") {
+                if let Some(window) = _app.get_webview_window("main") {
                     let vis = window_visible.clone();
                     let w = window.clone();
                     window.on_window_event(move |event| {
