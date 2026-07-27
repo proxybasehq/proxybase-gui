@@ -80,12 +80,10 @@ jobs:
 
       - name: Build release bundles
         if: matrix.os != 'macos-14'
-        run: pnpm tauri build -- --locked
-
+        run: pnpm tauri build 
       - name: Build release bundles (macOS universal)
         if: matrix.os == 'macos-14'
-        run: pnpm tauri build --target universal-apple-darwin -- --locked
-
+        run: pnpm tauri build --target universal-apple-darwin 
       - name: Collect release artifacts
         shell: bash
         run: |

@@ -81,8 +81,7 @@ jobs:
 
       - name: Build desktop app (no bundle)
         if: matrix.os != 'macos-14'
-        run: pnpm tauri build --debug --no-bundle -- --locked
-
+        run: pnpm tauri build --debug --no-bundle 
       - name: Build desktop app (no bundle - macOS universal)
         if: matrix.os == 'macos-14'
-        run: pnpm tauri build --debug --no-bundle --target universal-apple-darwin -- --locked
+        run: pnpm tauri build --debug --no-bundle --target universal-apple-darwin 
