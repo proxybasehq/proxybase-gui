@@ -110,7 +110,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: proxybasehq/libproxybase
-          path: ../libproxybase
+          path: libproxybase
+
+      - name: Link libproxybase to expected workspace-relative path
+        run: ln -s "$PWD/libproxybase" "$GITHUB_WORKSPACE/../libproxybase"
 
       - name: Setup Java
         uses: actions/setup-java@v4
