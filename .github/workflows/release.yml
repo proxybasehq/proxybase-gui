@@ -23,8 +23,23 @@ jobs:
           - macos-14
 
     steps:
-      - name: Checkout
+      - name: Checkout proxybase-gui
         uses: actions/checkout@v4
+
+      - name: Checkout libproxybase
+        uses: actions/checkout@v4
+        with:
+          repository: proxybasehq/libproxybase
+          path: libproxybase
+
+      - name: Link libproxybase (Unix)
+        if: runner.os != 'Windows'
+        run: ln -s "$PWD/libproxybase" "$GITHUB_WORKSPACE/../libproxybase"
+
+      - name: Link libproxybase (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: mklink /J ..\libproxybase libproxybase
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
