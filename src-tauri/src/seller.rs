@@ -606,6 +606,9 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
             headers.push_str(&line);
         }
         if !status.contains("101") {
+            if status.contains("401") || headers.contains("Unauthorized") || headers.contains("invalid_token") {
+                return Err("AUTH_EXPIRED".to_string());
+            }
             return Err(format!("Expected 101, got: {} | {}", status.trim(), headers.trim()));
         }
         drop(reader);
