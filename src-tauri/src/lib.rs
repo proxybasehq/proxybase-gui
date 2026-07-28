@@ -1,7 +1,7 @@
 mod api;
 pub mod bridge;
 mod commands;
-mod seller;
+pub mod seller;
 
 use seller::SellerState;
 use std::path::PathBuf;

@@ -1,7 +1,7 @@
 use crate::api::BackendClient;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::mpsc;
@@ -95,8 +95,8 @@ fn base64_decode(encoded: &str) -> Option<Vec<u8>> {
 // Stream relay (mirrors CLI run_stream_relay)
 // ---------------------------------------------------------------------------
 
-async fn run_stream_relay(
-    app_handle: AppHandle,
+async fn run_stream_relay<R: tauri::Runtime + 'static>(
+    app_handle: AppHandle<R>,
     target_dest: &str,
     target_ip: &str,
     target_port: u16,
@@ -234,12 +234,12 @@ fn build_paths(
     paths
 }
 
-pub async fn run_seller_ws_loop(
-    app_handle: AppHandle,
+pub async fn run_seller_ws_loop<R: tauri::Runtime + 'static>(
+    app_handle: AppHandle<R>,
     backend_url: String,
     upstreams: Vec<UpstreamProxy>,
     include_direct: bool,
-    mut shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+    shutdown_rx: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<()> {
     let paths = build_paths(&upstreams, include_direct);
     let base_url = backend_url.clone();
@@ -264,7 +264,8 @@ pub async fn run_seller_ws_loop(
         ));
     }
 
-    let _ = &mut shutdown_rx;
+    // Wait for external shutdown signal before stopping children
+    let _ = shutdown_rx.await;
 
     let (senders, joins): (Vec<_>, Vec<_>) = handles.into_iter().unzip();
     for tx in senders {
@@ -277,8 +278,8 @@ pub async fn run_seller_ws_loop(
     Ok(())
 }
 
-async fn run_single_path_loop(
-    app_handle: AppHandle,
+async fn run_single_path_loop<R: tauri::Runtime + 'static>(
+    app_handle: AppHandle<R>,
     backend_url: &str,
     path_id: &str,
     upstream: Option<&UpstreamProxy>,
@@ -356,11 +357,54 @@ async fn run_single_path_loop(
 }
 
 // ---------------------------------------------------------------------------
-// Raw WebSocket connection (no tungstenite — works around Android handshake bug)
+// Stream wrapper for plain TCP or TLS connections
 // ---------------------------------------------------------------------------
 
-/// Write a masked WebSocket text frame to a TCP stream.
-fn ws_write_text(tcp: &mut std::net::TcpStream, payload: &str) -> std::io::Result<()> {
+enum WsStream {
+    Plain(std::net::TcpStream),
+    Tls(rustls::StreamOwned<rustls::ClientConnection, std::net::TcpStream>),
+}
+
+impl WsStream {
+    fn set_nonblocking(&self, nonblocking: bool) -> std::io::Result<()> {
+        match self {
+            WsStream::Plain(tcp) => tcp.set_nonblocking(nonblocking),
+            WsStream::Tls(tls) => tls.get_ref().set_nonblocking(nonblocking),
+        }
+    }
+}
+
+impl Read for WsStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            WsStream::Plain(tcp) => tcp.read(buf),
+            WsStream::Tls(tls) => tls.read(buf),
+        }
+    }
+}
+
+impl Write for WsStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            WsStream::Plain(tcp) => tcp.write(buf),
+            WsStream::Tls(tls) => tls.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            WsStream::Plain(tcp) => tcp.flush(),
+            WsStream::Tls(tls) => tls.flush(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Raw WebSocket helpers (no tungstenite — works around Android handshake bug)
+// ---------------------------------------------------------------------------
+
+/// Write a masked WebSocket text frame.
+fn ws_write_text(stream: &mut impl Write, payload: &str) -> std::io::Result<()> {
     let len = payload.len();
     let mut header = vec![0x81u8]; // FIN + text opcode
     if len < 126 {
@@ -381,18 +425,18 @@ fn ws_write_text(tcp: &mut std::net::TcpStream, payload: &str) -> std::io::Resul
         .map(|(i, b)| b ^ mask[i % 4])
         .collect();
     header.extend_from_slice(&masked);
-    tcp.write_all(&header)
+    stream.write_all(&header)
 }
 
 /// Write a masked WebSocket ping frame (empty payload).
-fn ws_write_ping(tcp: &mut std::net::TcpStream) -> std::io::Result<()> {
+fn ws_write_ping(stream: &mut impl Write) -> std::io::Result<()> {
     let mask: [u8; 4] = rand::random();
     let frame = [0x89u8, 0x80, mask[0], mask[1], mask[2], mask[3]];
-    tcp.write_all(&frame)
+    stream.write_all(&frame)
 }
 
 /// Write a masked WebSocket pong frame.
-fn ws_write_pong(tcp: &mut std::net::TcpStream, payload: &[u8]) -> std::io::Result<()> {
+fn ws_write_pong(stream: &mut impl Write, payload: &[u8]) -> std::io::Result<()> {
     let len = payload.len();
     let mut header = vec![0x8Au8]; // FIN + pong opcode
     if len < 126 {
@@ -412,7 +456,7 @@ fn ws_write_pong(tcp: &mut std::net::TcpStream, payload: &[u8]) -> std::io::Resu
         .map(|(i, b)| b ^ mask[i % 4])
         .collect();
     header.extend_from_slice(&masked);
-    tcp.write_all(&header)
+    stream.write_all(&header)
 }
 
 /// Try to extract a complete WebSocket frame from `buf`.
@@ -459,8 +503,8 @@ fn ws_parse_frame(buf: &[u8]) -> Option<(Vec<u8>, u8, &[u8])> {
     Some((payload, opcode, &buf[payload_end..]))
 }
 
-async fn try_single_path_connection(
-    app_handle: AppHandle,
+async fn try_single_path_connection<R: tauri::Runtime + 'static>(
+    app_handle: AppHandle<R>,
     ws_url: &str,
     token: &str,
     path_id: &str,
@@ -492,6 +536,7 @@ async fn try_single_path_connection(
         use std::time::Instant;
 
         // Parse URL
+        let is_tls = url.starts_with("wss://");
         let without_scheme = url
             .strip_prefix("ws://")
             .or_else(|| url.strip_prefix("wss://"))
@@ -503,26 +548,49 @@ async fn try_single_path_connection(
         } else {
             "/"
         };
-        let (host, port) = hp.split_once(':').map_or((hp, 8080u16), |(h, p)| {
-            (h, p.parse::<u16>().unwrap_or(8080))
+        let default_port: u16 = if is_tls { 443 } else { 80 };
+        let (host, port) = hp.split_once(':').map_or((hp, default_port), |(h, p)| {
+            (h, p.parse::<u16>().unwrap_or(default_port))
         });
 
-        // TCP connect + WebSocket handshake
+        // TCP connect
         let addr = format!("{}:{}", host, port);
-        let mut tcp =
+        let tcp =
             TcpStream::connect(&addr).map_err(|e| format!("TCP {}: {}", addr, e))?;
 
+        // Wrap in TLS for wss:// connections
+        let mut stream: WsStream = if is_tls {
+            let mut root_store = rustls::RootCertStore::empty();
+            root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+            let config = rustls::ClientConfig::builder()
+                .with_root_certificates(root_store)
+                .with_no_client_auth();
+            let server_name = rustls::pki_types::ServerName::try_from(host.to_string())
+                .map_err(|e| format!("Invalid server name: {}", e))?;
+            let tls_conn = rustls::ClientConnection::new(Arc::new(config), server_name)
+                .map_err(|e| format!("TLS init: {}", e))?;
+            WsStream::Tls(rustls::StreamOwned::new(tls_conn, tcp))
+        } else {
+            WsStream::Plain(tcp)
+        };
+
+        // WebSocket handshake
         let key_bytes: [u8; 16] = rand::random();
         let key = base64_encode(&key_bytes);
+        let host_header = if (is_tls && port == 443) || (!is_tls && port == 80) {
+            host.to_string()
+        } else {
+            format!("{}:{}", host, port)
+        };
         let req = format!(
-            "GET {} HTTP/1.1\r\nHost: {}:{}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {}\r\n\r\n",
-            pq, host, port, key
+            "GET {} HTTP/1.1\r\nHost: {}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {}\r\n\r\n",
+            pq, host_header, key
         );
-        tcp.write_all(req.as_bytes())
+        stream.write_all(req.as_bytes())
             .map_err(|e| format!("Write upgrade: {}", e))?;
 
         // Read response
-        let mut reader = std::io::BufReader::new(&mut tcp);
+        let mut reader = std::io::BufReader::new(&mut stream);
         let mut status = String::new();
         reader.read_line(&mut status).map_err(|e| format!("Read status: {}", e))?;
         let mut headers = String::new();
@@ -542,12 +610,12 @@ async fn try_single_path_connection(
         let _ = app.emit("seller:connected", format!("[{}] Connected (raw WS)", pid));
 
         // Auth + path_info
-        ws_write_text(&mut tcp, &t).map_err(|e| format!("Send auth: {}", e))?;
+        ws_write_text(&mut stream, &t).map_err(|e| format!("Send auth: {}", e))?;
         let path_info = serde_json::json!({"type": "path_info", "path_id": &pid});
-        ws_write_text(&mut tcp, &serde_json::to_string(&path_info).unwrap_or_default())
+        ws_write_text(&mut stream, &serde_json::to_string(&path_info).unwrap_or_default())
             .map_err(|e| format!("Send path_info: {}", e))?;
 
-        tcp.set_nonblocking(true).map_err(|e| e.to_string())?;
+        stream.set_nonblocking(true).map_err(|e| e.to_string())?;
 
         let active: Arc<Mutex<HashMap<String, std::sync::mpsc::Sender<Vec<u8>>>>> =
             Arc::new(Mutex::new(HashMap::new()));
@@ -564,12 +632,12 @@ async fn try_single_path_connection(
 
             // Drain write channel
             while let Ok(msg) = ws_write_rx.try_recv() {
-                let _ = ws_write_text(&mut tcp, &msg);
+                let _ = ws_write_text(&mut stream, &msg);
             }
 
             // Timers
             if last_ping.elapsed() >= std::time::Duration::from_secs(30) {
-                let _ = ws_write_ping(&mut tcp);
+                let _ = ws_write_ping(&mut stream);
                 last_ping = Instant::now();
             }
             if last_hb.elapsed() >= std::time::Duration::from_secs(30) {
@@ -579,14 +647,14 @@ async fn try_single_path_connection(
                     "version": "0.1.0",
                 });
                 let _ = ws_write_text(
-                    &mut tcp,
+                    &mut stream,
                     &serde_json::to_string(&hb).unwrap_or_default(),
                 );
                 last_hb = Instant::now();
             }
 
             // Read
-            match tcp.read(&mut frame_buf) {
+            match stream.read(&mut frame_buf) {
                 Ok(0) => return Ok(()),
                 Ok(n) => read_buf.extend_from_slice(&frame_buf[..n]),
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -725,7 +793,7 @@ async fn try_single_path_connection(
                     0x8 => return Ok(()), // Close
                     0x9 => {
                         // Ping → Pong
-                        let _ = ws_write_pong(&mut tcp, &payload);
+                        let _ = ws_write_pong(&mut stream, &payload);
                     }
                     _ => {} // Pong (0xA) and others ignored
                 }
@@ -780,3 +848,212 @@ pub async fn stop_seller(state: State<'_, SellerState>) -> Result<(), String> {
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Unit tests for seller functionality
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_base64_encode_decode_roundtrip() {
+        // Empty
+        assert_eq!(base64_encode(b""), "");
+        assert_eq!(base64_decode(""), Some(vec![]));
+
+        // 1 byte padding (==)
+        assert_eq!(base64_encode(b"f"), "Zg==");
+        assert_eq!(base64_decode("Zg=="), Some(b"f".to_vec()));
+
+        // 2 bytes padding (=)
+        assert_eq!(base64_encode(b"fo"), "Zm8=");
+        assert_eq!(base64_decode("Zm8="), Some(b"fo".to_vec()));
+
+        // 3 bytes (no padding)
+        assert_eq!(base64_encode(b"foo"), "Zm9v");
+        assert_eq!(base64_decode("Zm9v"), Some(b"foo".to_vec()));
+
+        // Binary data (all 256 byte values)
+        let binary_data: Vec<u8> = (0..=255).collect();
+        let encoded = base64_encode(&binary_data);
+        let decoded = base64_decode(&encoded);
+        assert_eq!(decoded, Some(binary_data));
+    }
+
+    #[test]
+    fn test_base64_decode_invalid() {
+        // Invalid character
+        assert_eq!(base64_decode("Zg!="), None);
+    }
+
+    #[test]
+    fn test_percent_encode() {
+        // Alphanumerics & unreserved chars preserved
+        assert_eq!(percent_encode("abcXYZ123-._~"), "abcXYZ123-._~");
+
+        // Special characters encoded
+        assert_eq!(percent_encode("foo/bar?baz=1&token=a+b"), "foo%2Fbar%3Fbaz%3D1%26token%3Da%2Bb");
+
+        // Space encoded as %20
+        assert_eq!(percent_encode("hello world"), "hello%20world");
+    }
+
+    #[test]
+    fn test_build_paths_direct_only() {
+        let upstreams = vec![];
+        let paths = build_paths(&upstreams, true);
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0].0, "direct");
+        assert!(paths[0].1.is_none());
+    }
+
+    #[test]
+    fn test_build_paths_no_direct_empty_upstreams_fallback() {
+        // When include_direct is false and upstreams empty, falls back to direct
+        let upstreams = vec![];
+        let paths = build_paths(&upstreams, false);
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0].0, "direct");
+        assert!(paths[0].1.is_none());
+    }
+
+    #[test]
+    fn test_build_paths_with_upstreams() {
+        let upstreams = vec![
+            UpstreamProxy {
+                address: "1.1.1.1:1080".to_string(),
+                username: "u1".to_string(),
+                password: "p1".to_string(),
+            },
+            UpstreamProxy {
+                address: "2.2.2.2:1080".to_string(),
+                username: "u2".to_string(),
+                password: "p2".to_string(),
+            },
+        ];
+
+        // With direct included
+        let paths_with_direct = build_paths(&upstreams, true);
+        assert_eq!(paths_with_direct.len(), 3);
+        assert_eq!(paths_with_direct[0].0, "direct");
+        assert_eq!(paths_with_direct[1].0, "upstream_0");
+        assert_eq!(paths_with_direct[1].1.as_ref().unwrap().address, "1.1.1.1:1080");
+        assert_eq!(paths_with_direct[2].0, "upstream_1");
+
+        // Without direct
+        let paths_no_direct = build_paths(&upstreams, false);
+        assert_eq!(paths_no_direct.len(), 2);
+        assert_eq!(paths_no_direct[0].0, "upstream_0");
+        assert_eq!(paths_no_direct[1].0, "upstream_1");
+    }
+
+    #[test]
+    fn test_ws_write_and_parse_small_text_frame() {
+        let mut buf = Vec::new();
+        let payload = "Hello, ProxyBase!";
+        ws_write_text(&mut buf, payload).expect("write_text failed");
+
+        let parsed = ws_parse_frame(&buf);
+        assert!(parsed.is_some());
+        let (p_bytes, opcode, remaining) = parsed.unwrap();
+        assert_eq!(opcode, 0x1); // Text opcode
+        assert_eq!(String::from_utf8(p_bytes).unwrap(), payload);
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_ws_write_and_parse_extended_16bit_frame() {
+        let mut buf = Vec::new();
+        // Payload between 126 and 65535 bytes triggers 16-bit extended length header
+        let payload = "A".repeat(500);
+        ws_write_text(&mut buf, &payload).expect("write_text failed");
+
+        let parsed = ws_parse_frame(&buf);
+        assert!(parsed.is_some());
+        let (p_bytes, opcode, remaining) = parsed.unwrap();
+        assert_eq!(opcode, 0x1);
+        assert_eq!(String::from_utf8(p_bytes).unwrap(), payload);
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_ws_write_and_parse_ping_pong() {
+        // Test ping frame
+        let mut ping_buf = Vec::new();
+        ws_write_ping(&mut ping_buf).expect("write_ping failed");
+        let parsed_ping = ws_parse_frame(&ping_buf);
+        assert!(parsed_ping.is_some());
+        let (ping_payload, ping_opcode, _) = parsed_ping.unwrap();
+        assert_eq!(ping_opcode, 0x9); // Ping opcode
+        assert!(ping_payload.is_empty());
+
+        // Test pong frame with payload
+        let mut pong_buf = Vec::new();
+        let payload = b"ping_payload_data";
+        ws_write_pong(&mut pong_buf, payload).expect("write_pong failed");
+        let parsed_pong = ws_parse_frame(&pong_buf);
+        assert!(parsed_pong.is_some());
+        let (pong_payload, pong_opcode, _) = parsed_pong.unwrap();
+        assert_eq!(pong_opcode, 0x0A); // Pong opcode
+        assert_eq!(pong_payload, payload);
+    }
+
+    #[test]
+    fn test_ws_parse_frame_incomplete_buffers() {
+        assert!(ws_parse_frame(&[]).is_none());
+        assert!(ws_parse_frame(&[0x81]).is_none());
+        assert!(ws_parse_frame(&[0x81, 0x85]).is_none()); // Masked flag set, needs mask key + payload
+    }
+
+    #[test]
+    fn test_ws_parse_frame_multiple_in_stream() {
+        let mut buf = Vec::new();
+        ws_write_text(&mut buf, "Frame 1").unwrap();
+        ws_write_text(&mut buf, "Frame 2").unwrap();
+
+        // Parse first frame
+        let (payload1, opcode1, remaining1) = ws_parse_frame(&buf).expect("frame 1 should parse");
+        assert_eq!(opcode1, 0x1);
+        assert_eq!(String::from_utf8(payload1).unwrap(), "Frame 1");
+        assert!(!remaining1.is_empty());
+
+        // Parse second frame from remaining buffer
+        let (payload2, opcode2, remaining2) = ws_parse_frame(remaining1).expect("frame 2 should parse");
+        assert_eq!(opcode2, 0x1);
+        assert_eq!(String::from_utf8(payload2).unwrap(), "Frame 2");
+        assert!(remaining2.is_empty());
+    }
+
+    #[test]
+    fn test_seller_state_management() {
+        let state = SellerState::new();
+        assert!(state.shutdown_tx.lock().unwrap().is_none());
+
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+        *state.shutdown_tx.lock().unwrap() = Some(tx);
+        assert!(state.shutdown_tx.lock().unwrap().is_some());
+
+        let taken = state.shutdown_tx.lock().unwrap().take();
+        assert!(taken.is_some());
+        assert!(state.shutdown_tx.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_stream_event_serialization() {
+        let event = StreamEvent {
+            session_id: "sess_123".to_string(),
+            target_ip: "192.168.1.1".to_string(),
+            target_port: 8080,
+            route_index: Some(2),
+        };
+
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["session_id"], "sess_123");
+        assert_eq!(json["target_ip"], "192.168.1.1");
+        assert_eq!(json["target_port"], 8080);
+        assert_eq!(json["route_index"], 2);
+    }
+}
+
