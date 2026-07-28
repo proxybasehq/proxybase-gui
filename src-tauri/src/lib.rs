@@ -67,35 +67,36 @@ pub fn run() {
 
                 let window_visible = Arc::new(AtomicBool::new(false));
 
-                // ---- Tray icon: toggle window on click ----
-                let vis = window_visible.clone();
-                let _tray = TrayIconBuilder::new()
-                    .icon(_app.default_window_icon().unwrap().clone())
-                    .show_menu_on_left_click(false)
-                    .on_tray_icon_event(move |tray, event| {
-                        let app = tray.app_handle();
-                        tauri_plugin_positioner::on_tray_event(app, &event);
-                        if let tauri::tray::TrayIconEvent::Click { button_state, .. } = event {
-                            if button_state != tauri::tray::MouseButtonState::Up {
-                                return;
-                            }
-                            if let Some(window) = app.get_webview_window("main") {
-                                if vis.fetch_xor(true, Ordering::SeqCst) {
-                                    let _ = window.hide();
-                                } else {
-                                    use tauri_plugin_positioner::{Position, WindowExt};
-                                    #[cfg(target_os = "macos")]
-                                    let _ = window.move_window_constrained(Position::TrayBottomCenter);
-                                    #[cfg(not(target_os = "macos"))]
-                                    let _ = window.move_window_constrained(Position::TrayCenter);
-                                    let _ = window.show();
-                                    let _ = window.set_focus();
+                if let Some(icon) = _app.default_window_icon() {
+                    let vis = window_visible.clone();
+                    let icon_cloned = icon.clone();
+                    let _ = TrayIconBuilder::new()
+                        .icon(icon_cloned)
+                        .show_menu_on_left_click(false)
+                        .on_tray_icon_event(move |tray, event| {
+                            let app = tray.app_handle();
+                            tauri_plugin_positioner::on_tray_event(app, &event);
+                            if let tauri::tray::TrayIconEvent::Click { button_state, .. } = event {
+                                if button_state != tauri::tray::MouseButtonState::Up {
+                                    return;
+                                }
+                                if let Some(window) = app.get_webview_window("main") {
+                                    if vis.fetch_xor(true, Ordering::SeqCst) {
+                                        let _ = window.hide();
+                                    } else {
+                                        use tauri_plugin_positioner::{Position, WindowExt};
+                                        #[cfg(target_os = "macos")]
+                                        let _ = window.move_window_constrained(Position::TrayBottomCenter);
+                                        #[cfg(not(target_os = "macos"))]
+                                        let _ = window.move_window_constrained(Position::TrayCenter);
+                                        let _ = window.show();
+                                        let _ = window.set_focus();
+                                    }
                                 }
                             }
-                        }
-                    })
-                    .build(_app)
-                    .expect("failed to build tray icon");
+                        })
+                        .build(_app);
+                }
 
                 // Hide instead of close — so closing the window sends it to tray
                 if let Some(window) = _app.get_webview_window("main") {

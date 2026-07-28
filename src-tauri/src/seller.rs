@@ -766,26 +766,27 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                                 let sid2 = sid.clone();
                                 let active2 = active.clone();
                                 std::thread::spawn(move || {
-                                    let rt = tokio::runtime::Builder::new_current_thread()
-                                        .enable_io()
-                                        .enable_time()
-                                        .build()
-                                        .unwrap();
-                                    let app_emit = app2.clone();
-                                    rt.block_on(async {
-                                        let up_ref: Option<&UpstreamProxy> = up.as_ref();
-                                        run_stream_relay(
-                                            app2, &dest, &tip, tport, up_ref,
-                                            &relay_tx, tokio_rx, &sid2,
-                                        )
-                                        .await;
-                                        active2.lock().unwrap().remove(&sid2);
-                                        if !sid2.starts_with("probe_") {
-                                            let _ = app_emit
-                                                .emit("seller:stream-closed", &sid2);
-                                        }
-                                    });
-                                });
+                                     if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                                         .enable_io()
+                                         .enable_time()
+                                         .build()
+                                     {
+                                         let app_emit = app2.clone();
+                                         rt.block_on(async {
+                                             let up_ref: Option<&UpstreamProxy> = up.as_ref();
+                                             run_stream_relay(
+                                                 app2, &dest, &tip, tport, up_ref,
+                                                 &relay_tx, tokio_rx, &sid2,
+                                             )
+                                             .await;
+                                             active2.lock().unwrap().remove(&sid2);
+                                             if !sid2.starts_with("probe_") {
+                                                 let _ = app_emit
+                                                     .emit("seller:stream-closed", &sid2);
+                                             }
+                                         });
+                                     }
+                                 });
                             }
                             _ => {}
                         }

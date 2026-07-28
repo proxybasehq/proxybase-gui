@@ -87,10 +87,13 @@ macro_rules! call_api {
         match $expr.await {
             Ok(v) => Ok(v),
             Err(_e) => {
-                // Token may be stale (e.g. backend restarted) — re-auth silently
-                let _ = reauth($backend_url).await;
-                let $client = BackendClient::new($backend_url);
-                $expr.await.map_err(|e2| e2.to_string())
+                // Token may be stale (e.g. backend restarted) — re-auth silently if possible
+                if reauth($backend_url).await.is_ok() {
+                    let $client = BackendClient::new($backend_url);
+                    $expr.await.map_err(|e2| e2.to_string())
+                } else {
+                    Err(_e.to_string())
+                }
             }
         }
     }};
