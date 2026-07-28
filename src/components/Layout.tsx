@@ -138,13 +138,13 @@ export default function Layout() {
       setSellerConnected(true); setSellerRunning(true); setSellerError("");
     }).then((fn) => unlistens.push(fn));
     listen<string>("seller:disconnected", () => {
-      setSellerConnected(false); setSellerRunning(false); setSellerStreams([]); setSellerError("");
+      setSellerConnected(false); setSellerStreams([]);
     }).then((fn) => unlistens.push(fn));
     listen<string>("seller:error", (event) => {
-      setSellerError(event.payload); setSellerRunning(false); setSellerConnected(false); setSellerStreams([]);
+      setSellerError(event.payload); setSellerConnected(false); setSellerStreams([]);
     }).then((fn) => unlistens.push(fn));
     listen<string>("seller:reconnecting", (event) => {
-      setSellerError(event.payload);
+      setSellerError(event.payload); setSellerConnected(false);
     }).then((fn) => unlistens.push(fn));
     listen<{ session_id: string; target: string; error: string; upstream: boolean }>("seller:stream-error", (event) => {
       const { target, error, upstream } = event.payload;

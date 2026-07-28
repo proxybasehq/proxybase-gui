@@ -822,6 +822,8 @@ pub async fn start_seller(
     upstreams_json: String,
     include_direct: bool,
 ) -> Result<(), String> {
+    let _ = stop_seller(state.clone()).await;
+
     let upstreams: Vec<UpstreamProxy> = serde_json::from_str(&upstreams_json)
         .map_err(|e| format!("Invalid upstreams: {}", e))?;
 
