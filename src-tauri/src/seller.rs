@@ -562,7 +562,10 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
         let mut stream: WsStream = if is_tls {
             let mut root_store = rustls::RootCertStore::empty();
             root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-            let config = rustls::ClientConfig::builder()
+            let provider = Arc::new(rustls::crypto::ring::default_provider());
+            let config = rustls::ClientConfig::builder_with_provider(provider)
+                .with_safe_default_protocol_versions()
+                .map_err(|e| format!("TLS versions: {}", e))?
                 .with_root_certificates(root_store)
                 .with_no_client_auth();
             let server_name = rustls::pki_types::ServerName::try_from(host.to_string())

@@ -36,6 +36,8 @@ pub fn proxybase_dir() -> PathBuf {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let builder = tauri::Builder::default();
 
     let builder = builder
