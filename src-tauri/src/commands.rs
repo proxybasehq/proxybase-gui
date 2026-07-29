@@ -1,6 +1,17 @@
 use crate::api::BackendClient;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+
+// ---------------------------------------------------------------------------
+// Cached wallet password for silent re-authentication
+// ---------------------------------------------------------------------------
+
+/// Stores the last successfully used wallet password so that `reauth()` can
+/// load password-protected wallets without user intervention. Set by `login()`
+/// on success, cleared by `logout()`.
+static WALLET_PASSWORD: std::sync::LazyLock<Mutex<String>> =
+    std::sync::LazyLock::new(|| Mutex::new(String::new()));
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -39,12 +50,32 @@ fn require_auth(client: &BackendClient) -> Result<(), String> {
     }
 }
 
-/// Silently re-authenticate using the on-disk wallet (no password).
+/// Silently re-authenticate using the on-disk wallet.
+/// Tries the cached password first (set during `login()`), then falls back
+/// to an empty password for wallets without encryption.
 pub(crate) async fn reauth(backend_url: &str) -> Result<(), String> {
     let data_dir = crate::proxybase_dir();
     let mut wm =
         libproxybase::WalletManager::new(data_dir).map_err(|e| e.to_string())?;
-    wm.load("").map_err(|e| format!("Failed to load wallet: {}", e))?;
+
+    // Try cached password first, fall back to empty
+    let cached_pw = WALLET_PASSWORD.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let passwords_to_try: Vec<&str> = if cached_pw.is_empty() {
+        vec![""]
+    } else {
+        vec![&cached_pw, ""]
+    };
+
+    let mut loaded = false;
+    for pw in &passwords_to_try {
+        if wm.load(pw).is_ok() {
+            loaded = true;
+            break;
+        }
+    }
+    if !loaded {
+        return Err("Failed to load wallet: wrong password or corrupted wallet".to_string());
+    }
 
     let address = wm
         .address()
@@ -194,6 +225,11 @@ pub async fn login(
 
     BackendClient::save_token(&auth.session_token);
 
+    // Cache the password for silent re-authentication
+    if let Ok(mut cached) = WALLET_PASSWORD.lock() {
+        *cached = password.clone();
+    }
+
     Ok(LoginResult {
         session_token: auth.session_token,
         wallet_address: auth.wallet_address,
@@ -326,6 +362,10 @@ pub fn logout(app_handle: tauri::AppHandle) -> Result<(), String> {
     let path = crate::ensure_proxybase_dir(&app_handle).join("session_token");
     if path.exists() {
         std::fs::remove_file(&path).map_err(|e| format!("Failed to logout: {}", e))?;
+    }
+    // Clear cached wallet password
+    if let Ok(mut cached) = WALLET_PASSWORD.lock() {
+        cached.clear();
     }
     Ok(())
 }

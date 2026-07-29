@@ -459,6 +459,51 @@ fn ws_write_pong(stream: &mut impl Write, payload: &[u8]) -> std::io::Result<()>
     stream.write_all(&header)
 }
 
+/// Write a WebSocket text frame with retry on WouldBlock.
+/// On non-blocking sockets, `write_all` can fail with WouldBlock when the
+/// TCP send buffer is full. This retries up to 5 times with 20ms delays.
+/// Returns true if the write succeeded, false if all retries failed.
+fn ws_write_with_retry(stream: &mut impl Write, payload: &str) -> bool {
+    for attempt in 0..5 {
+        match ws_write_text(stream, payload) {
+            Ok(()) => return true,
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(20 * (attempt + 1)));
+            }
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
+/// Write a WebSocket ping frame with retry on WouldBlock.
+fn ws_ping_with_retry(stream: &mut impl Write) -> bool {
+    for attempt in 0..5 {
+        match ws_write_ping(stream) {
+            Ok(()) => return true,
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(20 * (attempt + 1)));
+            }
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
+/// Write a WebSocket pong frame with retry on WouldBlock.
+fn ws_pong_with_retry(stream: &mut impl Write, payload: &[u8]) -> bool {
+    for attempt in 0..5 {
+        match ws_write_pong(stream, payload) {
+            Ok(()) => return true,
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(20 * (attempt + 1)));
+            }
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
 /// Try to extract a complete WebSocket frame from `buf`.
 /// Returns `Some((payload, opcode, remaining))` if a frame was parsed,
 /// or `None` if more data is needed.
@@ -553,10 +598,19 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
             (h, p.parse::<u16>().unwrap_or(default_port))
         });
 
-        // TCP connect
+        // TCP connect with keepalive
         let addr = format!("{}:{}", host, port);
-        let tcp =
-            TcpStream::connect(&addr).map_err(|e| format!("TCP {}: {}", addr, e))?;
+        let tcp = {
+            let raw = TcpStream::connect(&addr).map_err(|e| format!("TCP {}: {}", addr, e))?;
+            // Enable TCP keepalive (30s interval) to survive NAT/firewall idle timeouts
+            let sock = socket2::Socket::from(raw);
+            let keepalive = socket2::TcpKeepalive::new()
+                .with_time(std::time::Duration::from_secs(30));
+            let _ = sock.set_tcp_keepalive(&keepalive);
+            let _ = sock.set_nodelay(true);
+            let tcp_back: TcpStream = sock.into();
+            tcp_back
+        };
 
         // Wrap in TLS for wss:// connections
         let mut stream: WsStream = if is_tls {
@@ -625,9 +679,9 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
 
         let active: Arc<Mutex<HashMap<String, std::sync::mpsc::Sender<Vec<u8>>>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let mut stream_count: u32 = 0;
         let mut last_ping = Instant::now();
         let mut last_hb = Instant::now();
+        let mut last_data_received = Instant::now(); // Connection watchdog
         let mut read_buf = Vec::new();
         let mut frame_buf = vec![0u8; 65536];
 
@@ -636,33 +690,46 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                 return Ok(());
             }
 
-            // Drain write channel
-            while let Ok(msg) = ws_write_rx.try_recv() {
-                let _ = ws_write_text(&mut stream, &msg);
+            // Connection watchdog: if no data received for 90s, connection is dead
+            if last_data_received.elapsed() >= std::time::Duration::from_secs(90) {
+                return Err("Connection watchdog: no data received for 90s".to_string());
             }
 
-            // Timers
-            if last_ping.elapsed() >= std::time::Duration::from_secs(30) {
-                let _ = ws_write_ping(&mut stream);
-                last_ping = Instant::now();
+            // Drain write channel (relay responses → WS)
+            while let Ok(msg) = ws_write_rx.try_recv() {
+                ws_write_with_retry(&mut stream, &msg);
             }
-            if last_hb.elapsed() >= std::time::Duration::from_secs(30) {
+
+            // Timers — only reset when write actually succeeds
+            if last_ping.elapsed() >= std::time::Duration::from_secs(20) {
+                if ws_ping_with_retry(&mut stream) {
+                    last_ping = Instant::now();
+                }
+                // If ping fails, don't reset — will retry next iteration
+            }
+            if last_hb.elapsed() >= std::time::Duration::from_secs(15) {
+                let stream_count = active.lock().unwrap().len() as u32;
                 let hb = serde_json::json!({
                     "type": "heartbeat",
                     "active_streams": stream_count,
                     "version": "0.1.0",
                 });
-                let _ = ws_write_text(
+                if ws_write_with_retry(
                     &mut stream,
                     &serde_json::to_string(&hb).unwrap_or_default(),
-                );
-                last_hb = Instant::now();
+                ) {
+                    last_hb = Instant::now();
+                }
+                // If heartbeat fails, don't reset — will retry next iteration
             }
 
             // Read
             match stream.read(&mut frame_buf) {
                 Ok(0) => return Ok(()),
-                Ok(n) => read_buf.extend_from_slice(&frame_buf[..n]),
+                Ok(n) => {
+                    read_buf.extend_from_slice(&frame_buf[..n]);
+                    last_data_received = Instant::now();
+                }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     // Continue to parse what we already have
@@ -724,7 +791,7 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                                     .and_then(|v| v.as_str())
                                     .map(|s| s.to_string());
                                 let dest = thost.unwrap_or_else(|| tip.clone());
-                                stream_count += 1;
+                                // stream_count tracked via active.lock().len()
 
                                 let (tcp_tx, tcp_rx) =
                                     std::sync::mpsc::channel::<Vec<u8>>();
@@ -799,10 +866,15 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                     }
                     0x8 => return Ok(()), // Close
                     0x9 => {
-                        // Ping → Pong
-                        let _ = ws_write_pong(&mut stream, &payload);
+                        // Ping → Pong (with retry)
+                        ws_pong_with_retry(&mut stream, &payload);
+                        last_data_received = Instant::now();
                     }
-                    _ => {} // Pong (0xA) and others ignored
+                    0xA => {
+                        // Pong received — update watchdog
+                        last_data_received = Instant::now();
+                    }
+                    _ => {}
                 }
             }
         }
