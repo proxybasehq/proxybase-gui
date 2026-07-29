@@ -133,12 +133,18 @@ async fn run_stream_relay<R: tauri::Runtime + 'static>(
             }
         }
         None => {
-            match tokio::net::TcpStream::connect(format!("{}:{}", target_ip, target_port)).await {
-                Ok(tcp) => {
+            match tokio::time::timeout(
+                Duration::from_secs(10),
+                tokio::net::TcpStream::connect(format!("{}:{}", target_ip, target_port)),
+            )
+            .await
+            {
+                Ok(Ok(tcp)) => {
                     let (r, w) = tokio::io::split(tcp);
                     Ok((Box::new(r), Box::new(w)))
                 }
-                Err(e) => Err(anyhow::anyhow!("TCP connect failed: {}", e)),
+                Ok(Err(e)) => Err(anyhow::anyhow!("TCP connect failed: {}", e)),
+                Err(_) => Err(anyhow::anyhow!("TCP connect timed out after 10s")),
             }
         }
     };
@@ -321,7 +327,7 @@ async fn run_single_path_loop<R: tauri::Runtime + 'static>(
                     format!("[{}] Disconnected. Reconnecting...", p),
                 );
             }
-            Err(e) if e.contains("AUTH_EXPIRED") => {
+            Err(e) if e.contains("AUTH_EXPIRED") || e.contains("401") => {
                 let _ = app.emit(
                     "seller:reconnecting",
                     format!("[{}] Token expired. Re-authenticating...", p),
@@ -405,7 +411,9 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
 
     let mut ping_tick = tokio::time::interval(Duration::from_secs(20));
     let mut heartbeat_tick = tokio::time::interval(Duration::from_secs(15));
+    let mut watchdog = tokio::time::interval(Duration::from_secs(90));
     let upstream_owned = upstream.cloned();
+    const MAX_STREAMS: usize = 100;
 
     loop {
         if shutdown.load(std::sync::atomic::Ordering::Relaxed) {
@@ -414,6 +422,11 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
         }
 
         tokio::select! {
+            _ = watchdog.tick() => {
+                // 90s silence — connection dead
+                relay_drain.abort();
+                return Err("Connection watchdog: no message in 90s".to_string());
+            }
             _ = ping_tick.tick() => {
                 let _ = relay_tx.send(Message::Ping(vec![].into()));
             }
@@ -427,6 +440,7 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                 let _ = relay_tx.send(Message::Text(serde_json::to_string(&hb).unwrap_or_default().into()));
             }
             msg = ws_stream.next() => {
+                watchdog.reset();
                 match msg {
                     Some(Ok(Message::Text(text))) => {
                         let p: serde_json::Value = match serde_json::from_str(&text) {
@@ -454,7 +468,15 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                                     }
                                 }
                             }
+                            Some("stream_close") => {
+                                let sid = p.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+                                active.lock().await.remove(sid);
+                            }
                             Some("stream_open") => {
+                                // Enforce concurrent stream limit
+                                if active.lock().await.len() >= MAX_STREAMS {
+                                    continue;
+                                }
                                 let sid = p.get("session_id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
                                 let tip = p.get("target_ip").and_then(|v| v.as_str()).unwrap_or("127.0.0.1").to_string();
                                 let tport = p.get("target_port").and_then(|v| v.as_u64()).unwrap_or(443) as u16;
