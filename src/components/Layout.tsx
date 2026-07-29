@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import BottomNav from "./BottomNav";
 import { useBackend } from "../hooks/useBackend";
 import type { StreamEvent, UpstreamProxy } from "../api";
+import { track, TrackEvent } from "../tracking";
 import {
   walletInfo,
   login as apiLogin,
@@ -109,6 +110,7 @@ export default function Layout() {
       setDepPreset(10);
       setDepCustomAmount("");
       navigate("/deposit");
+      track(TrackEvent.DEPOSIT_CREATE, { amount, currency: depCurrency });
     } catch (e) {
       const msg = String(e);
       if (msg.toLowerCase().includes("too small")) {
@@ -159,6 +161,7 @@ export default function Layout() {
     await registerSeller(beUrl);
     await apiStartSeller(beUrl, upstreams, includeDirect);
     setSellerRunning(true);
+    track(TrackEvent.SELLER_START, { upstreams: upstreams.length, includeDirect });
     try {
       const store = await load("proxybase-settings.json");
       await store.set("seller_config", { upstreams, includeDirect });
@@ -170,6 +173,7 @@ export default function Layout() {
   async function handleStopSeller() {
     await apiStopSeller();
     setSellerRunning(false); setSellerConnected(false);
+    track(TrackEvent.SELLER_STOP);
     try {
       const store = await load("proxybase-settings.json");
       await store.set("seller_running", false);
@@ -224,9 +228,10 @@ export default function Layout() {
     try { await apiLogout(); } catch (_) {}
     setIsAuth(false);
     navigate("/wallet");
+    track(TrackEvent.LOGOUT);
   }
 
-  function handleLoginSuccess() { setIsAuth(true); navigate("/market"); }
+  function handleLoginSuccess() { setIsAuth(true); navigate("/market"); track(TrackEvent.LOGIN); }
 
   const context: AppContext = {
     onLoginSuccess: handleLoginSuccess, isAuthenticated: isAuth, seller,

@@ -4,6 +4,7 @@ import { walletCreate, walletImport, walletInfo, login } from "../api";
 import type { CreateWalletResult } from "../api";
 import { useBackend } from "../hooks/useBackend";
 import PasswordInput from "../components/PasswordInput";
+import { track, TrackEvent } from "../tracking";
 
 type Step =
   | "checking"
@@ -54,6 +55,7 @@ export default function WelcomePage() {
     setLoading(true);
     try {
       const r: CreateWalletResult = await walletCreate(password);
+      track(TrackEvent.WALLET_CREATE);
       setMnemonic(r.mnemonic);
       setWalletAddr(r.address);
       setStep("create-done");
@@ -69,6 +71,7 @@ export default function WelcomePage() {
     setLoading(true);
     try {
       const r = await walletImport(importPhrase, password);
+      track(TrackEvent.WALLET_IMPORT);
       setWalletAddr(r.address);
       // Auto-login after import
       await login(backendUrl, password || "");

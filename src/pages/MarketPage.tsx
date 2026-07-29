@@ -6,6 +6,7 @@ import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
 import { formatUsdPerGb, PROXY_ADDRESS } from "../utils";
 import { CountryFlag } from "../components/CountryFlag";
+import { track, TrackEvent } from "../tracking";
 
 export default function MarketPage() {
   const { backendUrl } = useBackend();
@@ -186,6 +187,7 @@ export default function MarketPage() {
     try {
       await closeSession(backendUrl, sessionId);
       await bridgeStop(sessionId);
+      track(TrackEvent.SESSION_CLOSE, { sessionId });
       const nextPorts = { ...bridgePorts };
       delete nextPorts[sessionId];
       setBridgePorts(nextPorts);
@@ -202,6 +204,7 @@ export default function MarketPage() {
     setPriceBuyLoading(countryTypeKey);
     try {
       const session = await createSession(backendUrl, country, networkType, "rotating", null);
+      track(TrackEvent.SESSION_CREATE, { country, networkType });
       const sid = (session as any).session_id;
       if (sid && token) {
         try {
