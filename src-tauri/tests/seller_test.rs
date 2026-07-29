@@ -99,11 +99,14 @@ async fn test_seller_ws_connection_handshake_and_protocol() {
         }
         assert!(!sec_ws_key.is_empty(), "Sec-WebSocket-Key missing");
 
-        // Send 101 Switching Protocols response
-        let resp = "HTTP/1.1 101 Switching Protocols\r\n\
-                    Upgrade: websocket\r\n\
-                    Connection: Upgrade\r\n\
-                    Sec-WebSocket-Accept: dummy_accept\r\n\r\n";
+        let accept_key = tokio_tungstenite::tungstenite::handshake::derive_accept_key(sec_ws_key.as_bytes());
+        let resp = format!(
+            "HTTP/1.1 101 Switching Protocols\r\n\
+             Upgrade: websocket\r\n\
+             Connection: Upgrade\r\n\
+             Sec-WebSocket-Accept: {}\r\n\r\n",
+            accept_key
+        );
         stream.write_all(resp.as_bytes()).unwrap();
 
         // Read Frame 1: Auth token
