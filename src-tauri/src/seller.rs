@@ -411,7 +411,10 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
 
     let mut ping_tick = tokio::time::interval(Duration::from_secs(20));
     let mut heartbeat_tick = tokio::time::interval(Duration::from_secs(15));
-    let mut watchdog = tokio::time::interval(Duration::from_secs(90));
+    let mut watchdog = tokio::time::interval_at(
+        tokio::time::Instant::now() + Duration::from_secs(90),
+        Duration::from_secs(90),
+    );
     let upstream_owned = upstream.cloned();
     const MAX_STREAMS: usize = 100;
 
