@@ -105,7 +105,8 @@ jobs:
                 -name '*.deb' -o \
                 -name '*.rpm' -o \
                 -name '*.AppImage' -o \
-                -name '*.tar.gz' \
+                -name '*.tar.gz' -o \
+                -name '*.zip' \
               \) -exec cp {} dist/ \;
               # Collect updater manifest + signatures
               find "$dir" -type f \( \
@@ -121,7 +122,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bundles-${{ matrix.os }}
-          path: dist/*
+          path: dist/
           if-no-files-found: error
 
   # ---- Android build ----
@@ -223,28 +224,29 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-desktop, build-android]
     steps:
-      - name: Download desktop artifacts
+      - name: Download desktop & android artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           pattern: bundles-*
-          merge-multiple: true
 
-      - name: Merge updater manifests
+      - name: Merge updater manifests and prepare release assets
         shell: bash
         run: |
           set -euo pipefail
-          cd dist
-          # Each platform build produces its own latest.json with one platform.
-          # Merge them into a single manifest for the updater.
+
+          # Temp location for building final merged manifest
           MERGED=$(mktemp)
           echo '{"version":"","notes":"","pub_date":"","platforms":{}}' > "$MERGED"
 
-          for f in latest.json */latest.json; do
-            [ -f "$f" ] || continue
-            echo "Merging $f..."
+          echo "Searching for latest.json files..."
+          find dist -name "latest.json"
 
-            # Read version/notes/pub_date from first manifest that has them
+          for f in $(find dist -name "latest.json"); do
+            [ -f "$f" ] || continue
+            echo "Merging manifest $f..."
+
+            # Extract version/notes/pub_date
             v=$(jq -r '.version // empty' "$f")
             n=$(jq -r '.notes // empty' "$f")
             d=$(jq -r '.pub_date // empty' "$f")
@@ -257,20 +259,25 @@ jobs:
             jq --argjson p "$platforms" '.platforms += $p' "$MERGED" > tmp && mv tmp "$MERGED"
           done
 
-          cp "$MERGED" latest.json
-          echo "Final latest.json:"
-          cat latest.json
+          # Prepare flat directory for release assets
+          mkdir -p release_assets
+          find dist -type f -exec cp {} release_assets/ \;
+          cp "$MERGED" release_assets/latest.json
+
+          echo "Final latest.json content:"
+          cat release_assets/latest.json
 
       - name: Generate SHA256 checksums
         shell: bash
         run: |
           set -euo pipefail
-          cd dist
+          cd release_assets
           find . -type f ! -name SHA256SUMS.txt -exec sha256sum {} + | sort > SHA256SUMS.txt
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/*
+            release_assets/*
           generate_release_notes: true
+
