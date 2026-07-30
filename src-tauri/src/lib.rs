@@ -60,7 +60,8 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             tauri_plugin_autostart::MacosLauncher::default(),
             None::<Vec<&str>>,
-        ));
+        ))
+        .plugin(tauri_plugin_updater::Builder::new().build());
 
     builder
         .manage(SellerState::new())
@@ -147,6 +148,7 @@ pub fn run() {
             commands::get_token,
             commands::logout,
             commands::list_payouts,
+            commands::get_app_info,
             seller::start_seller,
             seller::stop_seller,
             bridge::bridge_start,

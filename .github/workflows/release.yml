@@ -80,10 +80,16 @@ jobs:
 
       - name: Build release bundles
         if: matrix.os != 'macos-14'
-        run: pnpm tauri build 
+        run: pnpm tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - name: Build release bundles (macOS universal)
         if: matrix.os == 'macos-14'
-        run: pnpm tauri build --target universal-apple-darwin 
+        run: pnpm tauri build --target universal-apple-darwin
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - name: Collect release artifacts
         shell: bash
         run: |

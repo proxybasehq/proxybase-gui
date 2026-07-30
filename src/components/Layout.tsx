@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
 import BottomNav from "./BottomNav";
+import UpdateBanner from "./UpdateBanner";
 import { useBackend } from "../hooks/useBackend";
 import type { StreamEvent, UpstreamProxy } from "../api";
 import { track, TrackEvent } from "../tracking";
@@ -241,6 +242,7 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
+      <UpdateBanner />
       <header className="app-header">
         <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span className="app-header-logo" style={{ display: "flex", alignItems: "center", gap: 8 }}>

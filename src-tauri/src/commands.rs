@@ -387,3 +387,27 @@ pub fn logout(app_handle: tauri::AppHandle) -> Result<(), String> {
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// App metadata
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppInfo {
+    pub version: String,
+    pub git_hash: String,
+    pub build_date: String,
+    pub os: String,
+    pub arch: String,
+}
+
+#[tauri::command]
+pub fn get_app_info() -> AppInfo {
+    AppInfo {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        git_hash: option_env!("BUILD_GIT_HASH").unwrap_or("dev").to_string(),
+        build_date: option_env!("BUILD_TIMESTAMP").unwrap_or("local").to_string(),
+        os: std::env::consts::OS.to_string(),
+        arch: std::env::consts::ARCH.to_string(),
+    }
+}

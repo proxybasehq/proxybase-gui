@@ -45,7 +45,13 @@ impl BackendClient {
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(30))
-            .user_agent(concat!("ProxyBase/", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!(
+                "ProxyBase/{} ({}; {}; git-{})",
+                env!("CARGO_PKG_VERSION"),
+                std::env::consts::OS,
+                std::env::consts::ARCH,
+                option_env!("BUILD_GIT_HASH").unwrap_or("dev"),
+            ).as_str())
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
         Self {

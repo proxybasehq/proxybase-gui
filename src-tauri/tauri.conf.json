@@ -25,6 +25,14 @@
       "devCsp": "default-src 'self'; script-src 'self' https://analytics.proxybase.xyz; connect-src 'self' http: https: ws: wss:; img-src 'self' asset: data: blob: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/proxybasehq/proxybase-gui/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIzRkE4QTlGRTJDMjJENDQKUldSRUxjTGluNHI2c3pkSnFPcjNkVlJvcGJ0bzNVbGQvTnVwMWsyWk1ESlNZbWNNSmhOKzlzZUgK"
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
