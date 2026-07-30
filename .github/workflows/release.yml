@@ -107,8 +107,15 @@ jobs:
                 -name '*.AppImage' -o \
                 -name '*.tar.gz' \
               \) -exec cp {} dist/ \;
+              # Collect updater manifest + signatures
+              find "$dir" -type f \( \
+                -name 'latest.json' -o \
+                -name '*.sig' \
+              \) -exec cp {} dist/ \; 2>/dev/null || true
             fi
           done
+          echo "Artifacts collected:"
+          ls -la dist/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -222,6 +229,37 @@ jobs:
           path: dist
           pattern: bundles-*
           merge-multiple: true
+
+      - name: Merge updater manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          # Each platform build produces its own latest.json with one platform.
+          # Merge them into a single manifest for the updater.
+          MERGED=$(mktemp)
+          echo '{"version":"","notes":"","pub_date":"","platforms":{}}' > "$MERGED"
+
+          for f in latest.json */latest.json; do
+            [ -f "$f" ] || continue
+            echo "Merging $f..."
+
+            # Read version/notes/pub_date from first manifest that has them
+            v=$(jq -r '.version // empty' "$f")
+            n=$(jq -r '.notes // empty' "$f")
+            d=$(jq -r '.pub_date // empty' "$f")
+            [ -n "$v" ] && jq --arg v "$v" '.version = $v' "$MERGED" > tmp && mv tmp "$MERGED"
+            [ -n "$n" ] && jq --arg n "$n" '.notes = $n' "$MERGED" > tmp && mv tmp "$MERGED"
+            [ -n "$d" ] && jq --arg d "$d" '.pub_date = $d' "$MERGED" > tmp && mv tmp "$MERGED"
+
+            # Merge platform entries
+            platforms=$(jq -r '.platforms // {}' "$f")
+            jq --argjson p "$platforms" '.platforms += $p' "$MERGED" > tmp && mv tmp "$MERGED"
+          done
+
+          cp "$MERGED" latest.json
+          echo "Final latest.json:"
+          cat latest.json
 
       - name: Generate SHA256 checksums
         shell: bash
