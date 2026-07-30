@@ -30,7 +30,7 @@
       "endpoints": [
         "https://github.com/proxybasehq/proxybase-gui/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIzRkE4QTlGRTJDMjJENDQKUldSRUxjTGluNHI2c3pkSnFPcjNkVlJvcGJ0bzNVbGQvTnVwMWsyWk1ESlNZbWNNSmhOKzlzZUgK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcyNkM5NUM3NDNFMTA1QTQKUldTa0JlRkR4NVZzY3Fyb1NyRGZtb2YwcElZNUZsK0RoTDRMbG1GTjVacUtXNHZWVVpmSklrNWkK"
     }
   },
   "bundle": {
