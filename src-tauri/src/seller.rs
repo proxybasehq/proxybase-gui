@@ -332,14 +332,19 @@ async fn run_single_path_loop<R: tauri::Runtime + 'static>(
                     "seller:reconnecting",
                     format!("[{}] Token expired. Re-authenticating...", p),
                 );
-                if crate::commands::reauth(backend_url).await.is_ok() {
+                let reauth_result = crate::commands::reauth(backend_url).await;
+                if reauth_result.is_ok() {
                     backoff_secs = 1;
                     let _ = app.emit("seller:connected", format!("[{}] Re-authenticated", p));
                 } else {
-                    let _ = app.emit(
-                        "seller:error",
-                        format!("[{}] Re-auth failed. Retrying...", p),
-                    );
+                    let err = reauth_result.unwrap_err();
+                    let msg = if err.contains("wrong password") || err.contains("Failed to load wallet") {
+                        let _ = app.emit("seller:needs-password", &p);
+                        format!("[{}] Wallet password required — enter password in app and restart seller", p)
+                    } else {
+                        format!("[{}] Re-auth failed: {}", p, err)
+                    };
+                    let _ = app.emit("seller:error", &msg);
                     tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
                     backoff_secs = (backoff_secs * 2).min(60);
                 }

@@ -258,47 +258,58 @@ export default function MarketPage() {
   useEffect(() => {
     let es: EventSource | null = null;
     let active = true;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
     async function setupSse() {
       try {
+        if (es) { es.close(); es = null; }
         const token = await getToken();
         if (!active) return;
-        
+
         const url = `${backendUrl}/v2/events?token=${encodeURIComponent(token)}`;
         console.log("[SSE] Connecting to", url);
-        
+
         es = new EventSource(url);
-        
+
         es.onmessage = (e) => {
           try {
             const evt = JSON.parse(e.data);
-            console.log("[SSE] Message received:", evt);
             if (evt.event === "PricingUpdate" || evt.event === "SellerPoolUpdate") {
               fetchPrices();
             }
             if (evt.event === "SessionUpdate") {
               fetchSessions();
             }
-          } catch (err) {
-            console.error("[SSE] Failed to parse message:", err);
-          }
+          } catch (_) { /* ignore parse errors */ }
         };
 
-        es.onerror = (e) => {
-          console.error("[SSE] Connection error:", e);
+        es.onerror = () => {
+          // Native EventSource reconnects with the same (stale) URL.
+          // Instead, close it and reconnect with a fresh token.
+          if (es) { es.close(); es = null; }
+          if (active) {
+            reconnectTimeout = setTimeout(setupSse, 2000);
+          }
         };
-      } catch (err) {
-        console.error("[SSE] Setup failed:", err);
-      }
+      } catch (_) { /* retry */ }
     }
 
     setupSse();
 
+    // Listen for token refresh — reconnect SSE with fresh token
+    const unlistenPromises: Promise<() => void>[] = [];
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen<string>("auth:token-updated", () => {
+        console.log("[SSE] Token refreshed, reconnecting...");
+        setupSse();
+      }).then(fn => unlistenPromises.push(Promise.resolve(fn)));
+    });
+
     return () => {
       active = false;
-      if (es) {
-        es.close();
-      }
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (es) es.close();
+      unlistenPromises.forEach(p => p.then(fn => fn()));
     };
   }, [backendUrl]);
 

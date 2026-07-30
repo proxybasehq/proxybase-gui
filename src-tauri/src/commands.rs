@@ -2,6 +2,7 @@ use crate::api::BackendClient;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
+use tauri::Emitter;
 
 // ---------------------------------------------------------------------------
 // Cached wallet password for silent re-authentication
@@ -105,6 +106,9 @@ pub(crate) async fn reauth(backend_url: &str) -> Result<(), String> {
         .map_err(|e| format!("Auth verify failed: {}", e))?;
 
     BackendClient::save_token(&auth.session_token);
+    if let Some(app) = crate::APP_HANDLE.get() {
+        let _ = app.emit("auth:token-updated", &auth.session_token);
+    }
     Ok(())
 }
 
@@ -224,6 +228,7 @@ pub async fn login(
         .map_err(|e| format!("Auth verify failed: {}", e))?;
 
     BackendClient::save_token(&auth.session_token);
+    let _ = app_handle.emit("auth:token-updated", &auth.session_token);
 
     // Cache the password for silent re-authentication
     if let Ok(mut cached) = WALLET_PASSWORD.lock() {
@@ -340,7 +345,20 @@ pub async fn list_sessions(backend_url: String) -> Result<serde_json::Value, Str
 #[tauri::command]
 pub async fn keepalive_session(backend_url: String, session_id: String) -> Result<(), String> {
     let client = BackendClient::new(&backend_url);
-    client.keepalive_session(&session_id).await.map_err(|e| e.to_string())
+    match client.keepalive_session(&session_id).await {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let err_str = e.to_string();
+            if err_str.contains("401") || err_str.contains("unauthorized") {
+                // Token expired — reauth and retry once
+                let _ = reauth(&backend_url).await;
+                let client2 = BackendClient::new(&backend_url);
+                client2.keepalive_session(&session_id).await.map_err(|e2| e2.to_string())
+            } else {
+                Err(err_str)
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

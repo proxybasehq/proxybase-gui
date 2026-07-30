@@ -4,6 +4,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 
+use crate::api::BackendClient;
+
 // ---------------------------------------------------------------------------
 // Tauri commands
 // ---------------------------------------------------------------------------
@@ -88,7 +90,10 @@ pub async fn start_bridge(
                         Ok((client_stream, client_addr)) => {
                             let up_addr = upstream_addr.clone();
                             let up_user = upstream_username.clone();
-                            let up_pass = upstream_password.clone();
+                            // Dynamically reload token on every connection so
+                            // re-auth'd tokens propagate to the bridge instantly.
+                            let up_pass = BackendClient::load_token()
+                                .unwrap_or_default();
                             eprintln!("[bridge {}] Accepted client {}", sid, client_addr);
                             tokio::spawn(async move {
                                 relay_through_upstream(

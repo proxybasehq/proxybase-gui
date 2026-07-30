@@ -72,7 +72,7 @@ impl BackendClient {
         crate::proxybase_dir().join("session_token")
     }
 
-    fn load_token() -> Option<String> {
+    pub fn load_token() -> Option<String> {
         std::fs::read_to_string(Self::token_path()).ok()
     }
 

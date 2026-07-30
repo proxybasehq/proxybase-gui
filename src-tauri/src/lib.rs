@@ -12,6 +12,13 @@ use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 
 static PROXYBASE_DIR: OnceLock<PathBuf> = OnceLock::new();
+static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
+
+/// Store a global AppHandle so background tasks can emit Tauri events
+/// without threading `AppHandle` through every call chain.
+pub fn app_handle() -> &'static tauri::AppHandle {
+    APP_HANDLE.get().expect("APP_HANDLE not initialised")
+}
 
 /// Ensure the OnceLock is set (first call wins). Returns the resolved path.
 pub fn ensure_proxybase_dir(app_handle: &tauri::AppHandle) -> PathBuf {
@@ -58,6 +65,8 @@ pub fn run() {
     builder
         .manage(SellerState::new())
         .setup(|_app| {
+            let _ = APP_HANDLE.set(_app.handle().clone());
+
             // Hide from dock on macOS
             #[cfg(target_os = "macos")]
             _app.set_activation_policy(tauri::ActivationPolicy::Accessory);
