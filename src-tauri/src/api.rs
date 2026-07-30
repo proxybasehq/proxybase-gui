@@ -1,10 +1,32 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 // ---------------------------------------------------------------------------
 // HTTP API client
 // ---------------------------------------------------------------------------
+
+/// Shared reqwest client — avoids creating a new connection pool on every call.
+fn http_client() -> reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(10))
+                .timeout(Duration::from_secs(30))
+                .user_agent(format!(
+                    "ProxyBase/{} ({}; {}; git-{})",
+                    env!("CARGO_PKG_VERSION"),
+                    std::env::consts::OS,
+                    std::env::consts::ARCH,
+                    option_env!("BUILD_GIT_HASH").unwrap_or("dev"),
+                ))
+                .build()
+                .expect("Failed to build reqwest client")
+        })
+        .clone()
+}
 
 pub struct BackendClient {
     http: reqwest::Client,
@@ -42,20 +64,8 @@ pub struct VerifyResponse {
 
 impl BackendClient {
     pub fn new(base_url: &str) -> Self {
-        let http = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(30))
-            .user_agent(format!(
-                "ProxyBase/{} ({}; {}; git-{})",
-                env!("CARGO_PKG_VERSION"),
-                std::env::consts::OS,
-                std::env::consts::ARCH,
-                option_env!("BUILD_GIT_HASH").unwrap_or("dev"),
-            ).as_str())
-            .build()
-            .unwrap_or_else(|_| reqwest::Client::new());
         Self {
-            http,
+            http: http_client(),
             base_url: base_url.trim_end_matches('/').to_string(),
             token: Self::load_token(),
         }
