@@ -9,6 +9,7 @@ use tokio::sync::{mpsc, Mutex};
 use tokio::time::Duration;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
+use tokio_util::sync::CancellationToken;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -115,21 +116,28 @@ async fn run_stream_relay<R: tauri::Runtime + 'static>(
         Box<dyn tokio::io::AsyncWrite + Unpin + Send>,
     )> = match upstream {
         Some(proxy) => {
-            match fast_socks5::client::Socks5Stream::connect_with_password(
-                &proxy.address,
-                target_dest.to_string(),
-                target_port,
-                proxy.username.clone(),
-                proxy.password.clone(),
-                fast_socks5::client::Config::default(),
+            // SOCKS5 connect has NO built-in timeout (Config::default() leaves
+            // connect_timeout as None), so a dead/stalling upstream would hold
+            // its socket FD forever. Bound the whole handshake like direct TCP.
+            match tokio::time::timeout(
+                Duration::from_secs(10),
+                fast_socks5::client::Socks5Stream::connect_with_password(
+                    &proxy.address,
+                    target_dest.to_string(),
+                    target_port,
+                    proxy.username.clone(),
+                    proxy.password.clone(),
+                    fast_socks5::client::Config::default(),
+                ),
             )
             .await
             {
-                Ok(stream) => {
+                Ok(Ok(stream)) => {
                     let (r, w) = tokio::io::split(stream);
                     Ok((Box::new(r), Box::new(w)))
                 }
-                Err(e) => Err(anyhow::anyhow!("SOCKS5 upstream connect failed: {:?}", e)),
+                Ok(Err(e)) => Err(anyhow::anyhow!("SOCKS5 upstream connect failed: {:?}", e)),
+                Err(_) => Err(anyhow::anyhow!("SOCKS5 upstream connect timed out after 10s")),
             }
         }
         None => {
@@ -167,54 +175,83 @@ async fn run_stream_relay<R: tauri::Runtime + 'static>(
 
     let tx2 = relay_tx.clone();
     let sid2 = sid.clone();
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
-    let tcp_to_ws = async {
-        let mut buf = vec![0u8; 8192];
-        loop {
-            match tokio::io::AsyncReadExt::read(&mut tcp_r, &mut buf).await {
-                Ok(0) => break,
-                Ok(n) => {
-                    let enc = base64_encode(&buf[..n]);
-                    let m = serde_json::json!({
-                        "type": "relay_response",
-                        "session_id": &sid2,
-                        "data": enc
-                    });
-                    if tx2
-                        .send(Message::Text(serde_json::to_string(&m).unwrap_or_default().into()))
-                        .is_err()
-                    {
-                        break;
+    // True inactivity timeout: traffic in either direction resets the clock.
+    // (A hard cap would silently kill long-lived buyer sessions after 60s; an
+    // idle timeout still closes abandoned probe/keep-alive connections so FDs
+    // cannot accumulate.)
+    let deadline = Arc::new(std::sync::Mutex::new(
+        tokio::time::Instant::now() + IDLE_TIMEOUT,
+    ));
+
+    let tcp_to_ws = {
+        let deadline = deadline.clone();
+        async move {
+            let mut buf = vec![0u8; 8192];
+            loop {
+                match tokio::io::AsyncReadExt::read(&mut tcp_r, &mut buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        *deadline.lock().unwrap() = tokio::time::Instant::now() + IDLE_TIMEOUT;
+                        let enc = base64_encode(&buf[..n]);
+                        let m = serde_json::json!({
+                            "type": "relay_response",
+                            "session_id": &sid2,
+                            "data": enc
+                        });
+                        if tx2
+                            .send(Message::Text(serde_json::to_string(&m).unwrap_or_default().into()))
+                            .is_err()
+                        {
+                            break;
+                        }
                     }
+                    Err(_) => break,
                 }
-                Err(_) => break,
             }
         }
     };
 
-    let ws_to_tcp = async {
-        while let Some(data) = tcp_rx.recv().await {
-            if tokio::io::AsyncWriteExt::write_all(&mut tcp_w, &data)
-                .await
-                .is_err()
-            {
-                break;
+    let ws_to_tcp = {
+        let deadline = deadline.clone();
+        async move {
+            while let Some(data) = tcp_rx.recv().await {
+                *deadline.lock().unwrap() = tokio::time::Instant::now() + IDLE_TIMEOUT;
+                if tokio::io::AsyncWriteExt::write_all(&mut tcp_w, &data)
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
             }
         }
     };
 
-    // 60s inactivity timeout prevents FD leaks from HTTP keep-alive
-    let relay_task = async {
-        tokio::select! {
-            _ = tcp_to_ws => {}
-            _ = ws_to_tcp => {}
+    // Sleep until the current idle deadline, re-checking it on each wake so
+    // any traffic keeps the relay alive indefinitely.
+    let idle_waiter = {
+        let deadline = deadline.clone();
+        async move {
+            loop {
+                let next = *deadline.lock().unwrap();
+                if tokio::time::Instant::now() >= next {
+                    break;
+                }
+                tokio::time::sleep_until(next).await;
+            }
         }
     };
-    if tokio::time::timeout(Duration::from_secs(60), relay_task).await.is_err() {
-        eprintln!("[RELAY {}] Inactivity timeout — closing", sid);
+
+    tokio::select! {
+        _ = tcp_to_ws => {}
+        _ = ws_to_tcp => {}
+        _ = idle_waiter => {
+            eprintln!("[RELAY {}] Idle timeout — closing", sid);
+        }
     }
-    // Clean up the active map entry if still present (RAII guard)
-    drop(tx2); // Close the relay_tx clone we're holding
+    // tx2 was moved into `tcp_to_ws` and is dropped with it when the select
+    // completes, releasing the relay channel clone this relay held.
 }
 
 // ---------------------------------------------------------------------------
@@ -266,29 +303,31 @@ pub async fn run_seller_ws_loop<R: tauri::Runtime + 'static>(
         format!("Starting {} path(s): {:?}", paths.len(), path_ids),
     );
 
+    // One token shared by every path: cancelling it stops active WS
+    // connections immediately and aborts their relay tasks, so a stopped
+    // seller can never linger (or stack another loop on restart).
+    let cancel = CancellationToken::new();
+
     let mut handles = Vec::new();
     for (path_id, upstream) in paths {
         let app = app_handle.clone();
         let url = base_url.clone();
-        let (shutdown_child_tx, shutdown_child_rx) = tokio::sync::oneshot::channel::<()>();
-        handles.push((
-            shutdown_child_tx,
-            tokio::spawn(async move {
-                run_single_path_loop(app, &url, &path_id, upstream.as_ref(), shutdown_child_rx)
-                    .await;
-            }),
-        ));
+        let child_cancel = cancel.clone();
+        handles.push(tokio::spawn(async move {
+            run_single_path_loop(app, &url, &path_id, upstream.as_ref(), child_cancel).await;
+        }));
     }
 
     // Wait for external shutdown signal before stopping children
     let _ = shutdown_rx.await;
+    cancel.cancel();
 
-    let (senders, joins): (Vec<_>, Vec<_>) = handles.into_iter().unzip();
-    for tx in senders {
-        let _ = tx.send(());
-    }
-    for h in joins {
-        let _ = h.await;
+    // Give children a moment to tear down cleanly; abort anything stubborn.
+    for handle in &mut handles {
+        if tokio::time::timeout(Duration::from_secs(5), &mut *handle).await.is_err() {
+            handle.abort();
+            let _ = handle.await;
+        }
     }
     let _ = app_handle.emit("seller:disconnected", "Seller stopped by user");
     Ok(())
@@ -299,12 +338,11 @@ async fn run_single_path_loop<R: tauri::Runtime + 'static>(
     backend_url: &str,
     path_id: &str,
     upstream: Option<&UpstreamProxy>,
-    mut shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+    shutdown: CancellationToken,
 ) {
     let upstream_owned = upstream.cloned();
     let pid = path_id.to_string();
     let mut backoff_secs = 1u64;
-    let shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     loop {
         let client = BackendClient::new(backend_url);
@@ -321,13 +359,9 @@ async fn run_single_path_loop<R: tauri::Runtime + 'static>(
         let app = app_handle.clone();
         let up = upstream_owned.clone();
         let p = pid.clone();
-        let flag = shutdown_flag.clone();
+        let cancel = shutdown.clone();
 
-        match try_single_path_connection(
-            app.clone(), &ws_url, &token, &p, up.as_ref(), flag,
-        )
-        .await
-        {
+        match try_single_path_connection(app.clone(), &ws_url, &token, &p, up.as_ref(), cancel).await {
             Ok(()) => {
                 backoff_secs = 1;
                 let _ = app.emit(
@@ -353,7 +387,10 @@ async fn run_single_path_loop<R: tauri::Runtime + 'static>(
                         format!("[{}] Re-auth failed: {}", p, err)
                     };
                     let _ = app.emit("seller:error", &msg);
-                    tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
+                    tokio::select! {
+                        _ = shutdown.cancelled() => return,
+                        _ = tokio::time::sleep(Duration::from_secs(backoff_secs)) => {}
+                    }
                     backoff_secs = (backoff_secs * 2).min(60);
                 }
             }
@@ -362,18 +399,30 @@ async fn run_single_path_loop<R: tauri::Runtime + 'static>(
                     "seller:error",
                     format!("[{}] {} — retrying in {}s", p, e, backoff_secs),
                 );
-                tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
+                tokio::select! {
+                    _ = shutdown.cancelled() => return,
+                    _ = tokio::time::sleep(Duration::from_secs(backoff_secs)) => {}
+                }
                 backoff_secs = (backoff_secs * 2).min(60);
             }
         }
 
         tokio::select! {
-            _ = &mut shutdown_rx => {
-                shutdown_flag.store(true, std::sync::atomic::Ordering::Relaxed);
-                return;
-            }
+            _ = shutdown.cancelled() => return,
             _ = tokio::time::sleep(Duration::from_millis(100)) => {}
         }
+    }
+}
+
+/// Abort the WS write-drain task and every spawned relay task. Called on every
+/// exit path so orphaned sockets/tasks can never outlive the path connection.
+fn abort_path_tasks(
+    relay_drain: &tokio::task::JoinHandle<()>,
+    relay_tasks: &[tokio::task::JoinHandle<()>],
+) {
+    relay_drain.abort();
+    for h in relay_tasks {
+        h.abort();
     }
 }
 
@@ -383,14 +432,18 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
     token: &str,
     path_id: &str,
     upstream: Option<&UpstreamProxy>,
-    shutdown: Arc<std::sync::atomic::AtomicBool>,
+    shutdown: CancellationToken,
 ) -> Result<(), String> {
     if token.is_empty() {
         return Err("No session token — please login first.".to_string());
     }
 
-    let (ws, _) = connect_async(ws_url)
+    // Bound the whole WS handshake (TCP + TLS + HTTP upgrade). The backend can
+    // stall at any stage; without a timeout the path loop wedges with a socket
+    // held open forever.
+    let (ws, _) = tokio::time::timeout(Duration::from_secs(15), connect_async(ws_url))
         .await
+        .map_err(|_| format!("WS connect {}: timed out after 15s", ws_url))?
         .map_err(|e| format!("WS connect {}: {}", ws_url, e))?;
 
     let (mut ws_sink, mut ws_stream) = ws.split();
@@ -422,6 +475,10 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
         }
     });
 
+    // Handles to every relay task spawned below; aborted together with the
+    // path connection so a hung SOCKS5/direct connect cannot leak a socket.
+    let mut relay_tasks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
+
     let mut ping_tick = tokio::time::interval(Duration::from_secs(20));
     let mut heartbeat_tick = tokio::time::interval(Duration::from_secs(15));
     let mut watchdog = tokio::time::interval_at(
@@ -432,15 +489,15 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
     const MAX_STREAMS: usize = 100;
 
     loop {
-        if shutdown.load(std::sync::atomic::Ordering::Relaxed) {
-            relay_drain.abort();
-            return Ok(());
-        }
-
         tokio::select! {
+            _ = shutdown.cancelled() => {
+                // Stop requested while connected — tear down immediately.
+                abort_path_tasks(&relay_drain, &relay_tasks);
+                return Ok(());
+            }
             _ = watchdog.tick() => {
                 // 90s silence — connection dead
-                relay_drain.abort();
+                abort_path_tasks(&relay_drain, &relay_tasks);
                 return Err("Connection watchdog: no message in 90s".to_string());
             }
             _ = ping_tick.tick() => {
@@ -464,7 +521,7 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                             Err(_) => continue,
                         };
                         if p.get("error").and_then(|v| v.as_str()) == Some("invalid_token") {
-                            relay_drain.abort();
+                            abort_path_tasks(&relay_drain, &relay_tasks);
                             return Err("AUTH_EXPIRED".to_string());
                         }
                         match p.get("type").and_then(|v| v.as_str()) {
@@ -520,7 +577,7 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                                 let active_cloned = active.clone();
                                 let tx_cloned = relay_tx.clone();
 
-                                tokio::spawn(async move {
+                                let handle = tokio::spawn(async move {
                                     run_stream_relay(
                                         app_cloned.clone(),
                                         &dest,
@@ -537,6 +594,7 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                                         let _ = app_cloned.emit("seller:stream-closed", &sid_cloned);
                                     }
                                 });
+                                relay_tasks.push(handle);
                             }
                             _ => {}
                         }
@@ -546,11 +604,11 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                     }
                     Some(Ok(Message::Pong(_))) => {}
                     Some(Ok(Message::Close(_))) | None => {
-                        relay_drain.abort();
+                        abort_path_tasks(&relay_drain, &relay_tasks);
                         return Ok(());
                     }
                     Some(Err(e)) => {
-                        relay_drain.abort();
+                        abort_path_tasks(&relay_drain, &relay_tasks);
                         return Err(format!("WS read error: {}", e));
                     }
                     _ => {}

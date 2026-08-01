@@ -36,6 +36,7 @@ hex = "0.4"
 dirs = "5"
 anyhow = "1"
 tokio = { version = "1", features = ["sync", "time", "net", "io-util", "macros"] }
+tokio-util = "0.7"
 fast-socks5 = "1.0.0"
 rand = "0.8"
 rustls = "0.23"

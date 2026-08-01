@@ -164,31 +164,51 @@ async fn relay_through_upstream(
     upstream_username: &str,
     upstream_password: &str,
 ) {
-    // Accept SOCKS5 handshake from client (no auth)
-    let target = match accept_socks5_noauth(&mut client).await {
-        Ok(t) => t,
-        Err(e) => {
+    // Bound the client SOCKS5 handshake so a stalled client cannot hold a
+    // socket (FD) forever.
+    let target = match tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        accept_socks5_noauth(&mut client),
+    )
+    .await
+    {
+        Ok(Ok(t)) => t,
+        Ok(Err(e)) => {
             eprintln!("Bridge SOCKS5 handshake failed: {}", e);
+            return;
+        }
+        Err(_) => {
+            eprintln!("Bridge SOCKS5 handshake timed out");
             return;
         }
     };
 
-    // Connect to upstream with auth
+    // Connect to upstream with auth. fast-socks5 has no built-in connect
+    // timeout (Config::default() leaves connect_timeout as None), so bound the
+    // whole upstream handshake to keep dead proxies from leaking sockets.
     let mut cfg = fast_socks5::client::Config::default();
     cfg.set_skip_auth(false);
-    let upstream = match fast_socks5::client::Socks5Stream::connect_with_password(
-        upstream_addr,
-        target.0,
-        target.1,
-        upstream_username.to_string(),
-        upstream_password.to_string(),
-        cfg,
+    cfg.set_connect_timeout(std::time::Duration::from_secs(10));
+    let upstream = match tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        fast_socks5::client::Socks5Stream::connect_with_password(
+            upstream_addr,
+            target.0,
+            target.1,
+            upstream_username.to_string(),
+            upstream_password.to_string(),
+            cfg,
+        ),
     )
     .await
     {
-        Ok(s) => s,
-        Err(e) => {
+        Ok(Ok(s)) => s,
+        Ok(Err(e)) => {
             eprintln!("Bridge upstream connect failed: {:?}", e);
+            return;
+        }
+        Err(_) => {
+            eprintln!("Bridge upstream connect timed out");
             return;
         }
     };
@@ -196,42 +216,82 @@ async fn relay_through_upstream(
     let (mut up_r, mut up_w) = tokio::io::split(upstream);
     let (mut cl_r, mut cl_w) = tokio::io::split(client);
 
+    // Idle timeout: traffic in either direction resets the clock. Abandoned
+    // tunnels close after 60s (matches the seller relay's idle timeout) so a
+    // client that never disconnects cannot hold sockets forever.
+    const IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+    let deadline = Arc::new(std::sync::Mutex::new(
+        tokio::time::Instant::now() + IDLE_TIMEOUT,
+    ));
+
     // Bidirectional relay
-    let up_to_cl = tokio::spawn(async move {
-        let mut buf = vec![0u8; 8192];
-        loop {
-            match up_r.read(&mut buf).await {
-                Ok(0) => break,
-                Ok(n) => {
-                    if cl_w.write_all(&buf[..n]).await.is_err() {
-                        break;
+    let mut up_to_cl = {
+        let deadline = deadline.clone();
+        tokio::spawn(async move {
+            let mut buf = vec![0u8; 8192];
+            loop {
+                match up_r.read(&mut buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        *deadline.lock().unwrap() =
+                            tokio::time::Instant::now() + IDLE_TIMEOUT;
+                        if cl_w.write_all(&buf[..n]).await.is_err() {
+                            break;
+                        }
                     }
+                    Err(_) => break,
                 }
-                Err(_) => break,
+            }
+        })
+    };
+
+    let mut cl_to_up = {
+        let deadline = deadline.clone();
+        tokio::spawn(async move {
+            let mut buf = vec![0u8; 8192];
+            loop {
+                match cl_r.read(&mut buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        *deadline.lock().unwrap() =
+                            tokio::time::Instant::now() + IDLE_TIMEOUT;
+                        if up_w.write_all(&buf[..n]).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        })
+    };
+
+    // Sleep until the current idle deadline, re-checking it on each wake so
+    // any traffic keeps the tunnel alive indefinitely.
+    let mut idle_task = tokio::spawn({
+        let deadline = deadline.clone();
+        async move {
+            loop {
+                let next = *deadline.lock().unwrap();
+                if tokio::time::Instant::now() >= next {
+                    break;
+                }
+                tokio::time::sleep_until(next).await;
             }
         }
     });
 
-    let cl_to_up = tokio::spawn(async move {
-        let mut buf = vec![0u8; 8192];
-        loop {
-            match cl_r.read(&mut buf).await {
-                Ok(0) => break,
-                Ok(n) => {
-                    if up_w.write_all(&buf[..n]).await.is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    // Wait for either direction to finish
     tokio::select! {
-        _ = up_to_cl => {}
-        _ = cl_to_up => {}
+        _ = &mut up_to_cl => {}
+        _ = &mut cl_to_up => {}
+        _ = &mut idle_task => {
+            eprintln!("Bridge relay idle timeout — closing");
+        }
     }
+    // Abort whichever direction is still running so BOTH socket halves close
+    // immediately (previously the other task kept running, leaking sockets).
+    up_to_cl.abort();
+    cl_to_up.abort();
+    idle_task.abort();
 }
 
 /// Minimal SOCKS5 connect accept (no auth, only CONNECT command).

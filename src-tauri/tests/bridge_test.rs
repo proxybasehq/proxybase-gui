@@ -143,9 +143,15 @@ async fn test_bridge_full_flow() {
         "should pass username: {}",
         response
     );
+    // The bridge intentionally reloads the session token from disk on every
+    // connection (so re-auth'd tokens propagate to existing bridges),
+    // ignoring the password passed at start. Expect the current on-disk token.
+    let expected_pass =
+        std::fs::read_to_string(proxybase_gui_lib::proxybase_dir().join("session_token"))
+            .unwrap_or_default();
     assert!(
-        response.contains("pass=mypass"),
-        "should pass password: {}",
+        response.contains(&format!("pass={}", expected_pass)),
+        "should pass current session token: {}",
         response
     );
     assert!(
