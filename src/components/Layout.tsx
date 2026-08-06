@@ -20,6 +20,7 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import { load } from "@tauri-apps/plugin-store";
 import { enable } from "@tauri-apps/plugin-autostart";
+import { invoke } from "@tauri-apps/api/core";
 import QRCode from "qrcode";
 import { setPendingDeposit } from "../pages/DepositPage";
 
@@ -206,6 +207,33 @@ export default function Layout() {
 
   useEffect(() => { checkAuth(); }, [checkAuth]);
   useEffect(() => { enable().catch(() => {}); }, []);
+
+  // UI watchdog heartbeat: tells the Rust side the UI thread is alive so it
+  // can auto-recover (reload) if the webview ever wedges, e.g. after sleep.
+  useEffect(() => {
+    const hb = setInterval(() => {
+      invoke("ui_heartbeat").catch(() => {});
+    }, 10_000);
+    return () => clearInterval(hb);
+  }, []);
+
+  // When the app becomes active again (wake from sleep, focus, tab shown),
+  // re-validate auth (refreshes a stale token) and tell pages to reconnect
+  // their live streams (SSE) with the fresh token.
+  useEffect(() => {
+    const onResume = () => {
+      if (document.visibilityState === "visible") {
+        checkAuth();
+        window.dispatchEvent(new Event("app-resumed"));
+      }
+    };
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onResume);
+    return () => {
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onResume);
+    };
+  }, [checkAuth]);
 
   useEffect(() => {
     if (!isAuth || sellerRunning) return;

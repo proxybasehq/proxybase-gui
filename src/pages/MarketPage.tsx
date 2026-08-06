@@ -259,6 +259,12 @@ export default function MarketPage() {
     let es: EventSource | null = null;
     let active = true;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    // Exponential backoff (2s → 60s) with jitter. Previously this retried
+    // every 2s forever on a stale token/network loss, hammering the backend
+    // and draining energy.
+    let backoffMs = 2000;
+    const MAX_BACKOFF_MS = 60_000;
+    let lastPriceFetch = 0;
 
     async function setupSse() {
       try {
@@ -267,15 +273,23 @@ export default function MarketPage() {
         if (!active) return;
 
         const url = `${backendUrl}/v2/events?token=${encodeURIComponent(token)}`;
-        console.log("[SSE] Connecting to", url);
 
         es = new EventSource(url);
+
+        es.onopen = () => {
+          backoffMs = 2000;
+        };
 
         es.onmessage = (e) => {
           try {
             const evt = JSON.parse(e.data);
             if (evt.event === "PricingUpdate" || evt.event === "SellerPoolUpdate") {
-              fetchPrices();
+              // Debounce: SSE can burst (seller churn, wake from sleep).
+              const now = Date.now();
+              if (now - lastPriceFetch > 10_000) {
+                lastPriceFetch = now;
+                fetchPrices();
+              }
             }
             if (evt.event === "SessionUpdate") {
               fetchSessions();
@@ -288,13 +302,19 @@ export default function MarketPage() {
           // Instead, close it and reconnect with a fresh token.
           if (es) { es.close(); es = null; }
           if (active) {
-            reconnectTimeout = setTimeout(setupSse, 2000);
+            const delay = backoffMs + Math.floor(Math.random() * 500);
+            backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
+            reconnectTimeout = setTimeout(setupSse, delay);
           }
         };
       } catch (_) { /* retry */ }
     }
 
     setupSse();
+
+    // Reconnect with a fresh token when the app wakes from sleep.
+    const onResumed = () => { if (active) setupSse(); };
+    window.addEventListener("app-resumed", onResumed);
 
     // Listen for token refresh — reconnect SSE with fresh token
     const unlistenPromises: Promise<() => void>[] = [];
@@ -309,6 +329,7 @@ export default function MarketPage() {
       active = false;
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (es) es.close();
+      window.removeEventListener("app-resumed", onResumed);
       unlistenPromises.forEach(p => p.then(fn => fn()));
     };
   }, [backendUrl]);

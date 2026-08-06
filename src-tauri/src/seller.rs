@@ -38,6 +38,17 @@ pub struct SellerState {
     pub shutdown_tx: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 
+/// Exponential backoff with ±20% jitter so multiple paths do not reconnect in
+/// lockstep after an outage or wake from sleep.
+fn jittered_backoff(secs: u64) -> Duration {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    let factor = 0.8 + (nanos % 401) as f64 / 1000.0; // 0.8 ..= 1.2
+    Duration::from_secs_f64(secs as f64 * factor)
+}
+
 impl SellerState {
     pub fn new() -> Self {
         Self {
@@ -389,7 +400,7 @@ async fn run_single_path_loop<R: tauri::Runtime + 'static>(
                     let _ = app.emit("seller:error", &msg);
                     tokio::select! {
                         _ = shutdown.cancelled() => return,
-                        _ = tokio::time::sleep(Duration::from_secs(backoff_secs)) => {}
+                        _ = tokio::time::sleep(jittered_backoff(backoff_secs)) => {}
                     }
                     backoff_secs = (backoff_secs * 2).min(60);
                 }
@@ -401,7 +412,7 @@ async fn run_single_path_loop<R: tauri::Runtime + 'static>(
                 );
                 tokio::select! {
                     _ = shutdown.cancelled() => return,
-                    _ = tokio::time::sleep(Duration::from_secs(backoff_secs)) => {}
+                    _ = tokio::time::sleep(jittered_backoff(backoff_secs)) => {}
                 }
                 backoff_secs = (backoff_secs * 2).min(60);
             }

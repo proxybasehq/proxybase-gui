@@ -14,6 +14,20 @@ use tauri::Manager;
 static PROXYBASE_DIR: OnceLock<PathBuf> = OnceLock::new();
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 
+/// Tracks the last frontend heartbeat so a wedged webview (e.g. after system
+/// hibernation) can be auto-recovered by reloading the window.
+pub struct UiWatchdog {
+    pub last_heartbeat: std::sync::Mutex<std::time::Instant>,
+}
+
+impl UiWatchdog {
+    pub fn new() -> Self {
+        Self {
+            last_heartbeat: std::sync::Mutex::new(std::time::Instant::now()),
+        }
+    }
+}
+
 /// Store a global AppHandle so background tasks can emit Tauri events
 /// without threading `AppHandle` through every call chain.
 pub fn app_handle() -> &'static tauri::AppHandle {
@@ -124,6 +138,42 @@ pub fn run() {
                 }
             }
 
+            // UI watchdog: the frontend reports a heartbeat every 10s. If the
+            // webview stops responding while its window is visible (a known
+            // failure after system sleep/hibernation), reload it automatically
+            // instead of forcing the user to kill and restart the process.
+            _app.manage(UiWatchdog::new());
+            {
+                let wd_app = _app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                        let stale = wd_app
+                            .state::<UiWatchdog>()
+                            .last_heartbeat
+                            .lock()
+                            .map(|g| g.elapsed())
+                            .unwrap_or_default();
+                        if stale > std::time::Duration::from_secs(120) {
+                            if let Some(window) = wd_app.get_webview_window("main") {
+                                if window.is_visible().unwrap_or(false) {
+                                    eprintln!(
+                                        "[ui-watchdog] UI unresponsive for {:.0}s — reloading webview",
+                                        stale.as_secs_f64()
+                                    );
+                                    let _ = window.eval("window.location.reload()");
+                                    if let Ok(mut g) =
+                                        wd_app.state::<UiWatchdog>().last_heartbeat.lock()
+                                    {
+                                        *g = std::time::Instant::now();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -149,6 +199,7 @@ pub fn run() {
             commands::logout,
             commands::list_payouts,
             commands::get_app_info,
+            commands::ui_heartbeat,
             seller::start_seller,
             seller::stop_seller,
             bridge::bridge_start,

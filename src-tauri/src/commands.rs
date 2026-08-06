@@ -411,3 +411,16 @@ pub fn get_app_info() -> AppInfo {
         arch: std::env::consts::ARCH.to_string(),
     }
 }
+
+// ---------------------------------------------------------------------------
+// UI watchdog
+// ---------------------------------------------------------------------------
+
+/// Frontend heartbeat — signals the UI thread is responsive. If this stops
+/// while the window is visible, the Rust watchdog reloads the webview.
+#[tauri::command]
+pub fn ui_heartbeat(state: tauri::State<'_, crate::UiWatchdog>) {
+    if let Ok(mut last) = state.last_heartbeat.lock() {
+        *last = std::time::Instant::now();
+    }
+}
