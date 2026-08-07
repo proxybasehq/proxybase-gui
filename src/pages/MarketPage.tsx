@@ -525,7 +525,7 @@ export default function MarketPage() {
                     <th>Type</th>
                     <th>Mode</th>
                     <th>Status</th>
-                    <th style={{ width: 40 }}></th>
+                    <th className="table-action" style={{ width: 40 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -538,7 +538,7 @@ export default function MarketPage() {
                       <td><span className="badge">{(s as any).network_type || (s as any).proxy_category || "-"}</span></td>
                       <td><span className="badge">{(s as any).session_type || "-"}</span></td>
                       <td><span className={`badge ${(s as any).status === "active" ? "badge-success" : ""}`}>{(s as any).status || "-"}</span></td>
-                      <td onClick={(e) => e.stopPropagation()}>
+                      <td className="table-action" onClick={(e) => e.stopPropagation()}>
                         <button className="btn btn-sm btn-danger" style={{ padding: "0 6px", height: 26, fontSize: 11 }}
                           onClick={() => handleClose((s as any).session_id)}
                           disabled={closingId === (s as any).session_id} title="Close session">

@@ -378,8 +378,22 @@ textarea.form-input {
 
 /* ---- Tables ---- */
 .table-container {
-  overflow-x: hidden;
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Pin the action column (e.g. close button) to the right edge so it stays
+   visible even when the table is wider than the window. */
+.table-action {
+  position: sticky;
+  right: 0;
+  background: var(--color-canvas);
+  box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+}
+
+tr:hover td.table-action {
+  background: var(--color-canvas);
 }
 
 table {
