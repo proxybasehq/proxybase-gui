@@ -90,6 +90,18 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Verify versions are consistent
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG=$(node -p "require('./package.json').version")
+          CONF=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          CARGO=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
+          echo "package.json=$PKG tauri.conf.json=$CONF Cargo.toml=$CARGO"
+          [ "$PKG" = "$CONF" ] && [ "$PKG" = "$CARGO" ] || {
+            echo "ERROR: version mismatch — refusing to build a release with mismatched versions" >&2
+            exit 1
+          }
       - name: Collect release artifacts
         shell: bash
         run: |
@@ -115,6 +127,13 @@ jobs:
               \) -exec cp {} dist/ \; 2>/dev/null || true
             fi
           done
+          # Tauri v2 generates per-artifact .sig files, but this CLI version
+          # does NOT emit latest.json in the bundle dir — the final manifest is
+          # assembled in the publish job from these sigs.
+          if ! ls dist/*.sig >/dev/null 2>&1; then
+            echo "ERROR: no .sig files generated — updater artifacts incomplete." >&2
+            exit 1
+          fi
           echo "Artifacts collected:"
           ls -la dist/
 
@@ -230,41 +249,75 @@ jobs:
           path: dist
           pattern: bundles-*
 
-      - name: Merge updater manifests and prepare release assets
+      - name: Build updater manifest (latest.json) and prepare release assets
         shell: bash
         run: |
           set -euo pipefail
 
-          # Temp location for building final merged manifest
+          # Version from the release tag (proxybase-gui-v0.1.56 -> 0.1.56),
+          # falling back to the version embedded in an artifact filename.
+          VERSION="${GITHUB_REF_NAME#proxybase-gui-v}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            FIRST_ARTIFACT=$(find dist -type f ! -name '*.sig' | head -1)
+            VERSION=$(basename "$FIRST_ARTIFACT" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          fi
+          [ -n "$VERSION" ] || { echo "ERROR: could not determine version" >&2; exit 1; }
+
+          BASE_URL="https://github.com/proxybasehq/proxybase-gui/releases/download/${GITHUB_REF_NAME}"
+          PUB_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
           MERGED=$(mktemp)
-          echo '{"version":"","notes":"","pub_date":"","platforms":{}}' > "$MERGED"
+          jq -n --arg v "$VERSION" --arg n "" --arg d "$PUB_DATE" \
+            '{version:$v, notes:$n, pub_date:$d, platforms:{}}' > "$MERGED"
 
-          echo "Searching for latest.json files..."
-          find dist -name "latest.json"
+          add_platform() {
+            local key="$1" file="$2" sig_file="$3"
+            local sig_content
+            sig_content=$(tr -d '\r\n' < "$sig_file")
+            jq --arg key "$key" \
+               --arg url "$BASE_URL/$(basename "$file")" \
+               --arg sig "$sig_content" \
+               '.platforms[$key] = {url: $url, signature: $sig}' "$MERGED" > tmp && mv tmp "$MERGED"
+            echo "  $key -> $(basename "$file")"
+          }
 
-          for f in $(find dist -name "latest.json"); do
-            [ -f "$f" ] || continue
-            echo "Merging manifest $f..."
-
-            # Extract version/notes/pub_date
-            v=$(jq -r '.version // empty' "$f")
-            n=$(jq -r '.notes // empty' "$f")
-            d=$(jq -r '.pub_date // empty' "$f")
-            [ -n "$v" ] && jq --arg v "$v" '.version = $v' "$MERGED" > tmp && mv tmp "$MERGED"
-            [ -n "$n" ] && jq --arg n "$n" '.notes = $n' "$MERGED" > tmp && mv tmp "$MERGED"
-            [ -n "$d" ] && jq --arg d "$d" '.pub_date = $d' "$MERGED" > tmp && mv tmp "$MERGED"
-
-            # Merge platform entries
-            platforms=$(jq -r '.platforms // {}' "$f")
-            jq --argjson p "$platforms" '.platforms += $p' "$MERGED" > tmp && mv tmp "$MERGED"
+          # Build platform entries from the signature files (one per updater
+          # artifact). Keys match tauri-plugin-updater's target strings:
+          # linux-x86_64, windows-x86_64, darwin-x86_64, darwin-aarch64.
+          echo "Mapping updater artifacts:"
+          for sig in $(find dist -type f -name '*.sig' | sort); do
+            artifact="${sig%.sig}"
+            base="$(basename "$artifact")"
+            case "$base" in
+              *.AppImage)
+                add_platform "linux-x86_64" "$artifact" "$sig" ;;
+              *.msi|*x64-setup.exe|*-setup.exe)
+                add_platform "windows-x86_64" "$artifact" "$sig" ;;
+              *_aarch64.app.tar.gz)
+                add_platform "darwin-aarch64" "$artifact" "$sig" ;;
+              *_x64.app.tar.gz|*_x86_64.app.tar.gz)
+                add_platform "darwin-x86_64" "$artifact" "$sig" ;;
+              *.app.tar.gz)
+                # Universal macOS build serves both architectures.
+                add_platform "darwin-x86_64" "$artifact" "$sig"
+                add_platform "darwin-aarch64" "$artifact" "$sig" ;;
+              *)
+                echo "  (skipping unknown updater artifact: $base)" ;;
+            esac
           done
+
+          PLATFORM_COUNT=$(jq '.platforms | length' "$MERGED")
+          if [ "$PLATFORM_COUNT" -eq 0 ]; then
+            echo "ERROR: no updater artifacts found — refusing to publish" >&2
+            exit 1
+          fi
 
           # Prepare flat directory for release assets
           mkdir -p release_assets
           find dist -type f -exec cp {} release_assets/ \;
           cp "$MERGED" release_assets/latest.json
 
-          echo "Final latest.json content:"
+          echo "Generated latest.json:"
           cat release_assets/latest.json
 
       - name: Generate SHA256 checksums
@@ -280,4 +333,3 @@ jobs:
           files: |
             release_assets/*
           generate_release_notes: true
-
