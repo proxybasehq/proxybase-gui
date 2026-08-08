@@ -1,6 +1,6 @@
 [package]
 name = "proxybase-gui"
-version = "0.1.57"
+version = "0.1.58"
 description = "ProxyBase desktop GUI built with Tauri"
 authors = ["ProxyBase Team"]
 edition = "2021"
@@ -47,6 +47,7 @@ uuid = { version = "1.20.0", features = ["v4"] }
 tauri-plugin-positioner = { version = "2.3.2", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }

@@ -75,6 +75,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::default(),
             None::<Vec<&str>>,
         ))
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build());
 
     builder

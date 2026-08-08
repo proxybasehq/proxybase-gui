@@ -86,7 +86,11 @@ export function useUpdater() {
   }, [update]);
 
   const restartApp = useCallback(async () => {
-    await relaunch();
+    try {
+      await relaunch();
+    } catch (err) {
+      setError(String(err));
+    }
   }, []);
 
   // Check on mount + every 6 hours

@@ -6,6 +6,7 @@ export default function UpdateBanner() {
     downloading,
     progress,
     readyToRestart,
+    error,
     downloadAndInstall,
     restartApp,
   } = useUpdater();
@@ -33,6 +34,11 @@ export default function UpdateBanner() {
           ? `Downloading update${progress ? ` (${progress.percentage}%)` : ""}...`
           : `v${update?.version} available`}
       </span>
+      {error && (
+        <span style={{ fontSize: 11, opacity: 0.9 }} title={error}>
+          Restart failed — click Restart again or relaunch manually.
+        </span>
+      )}
       <span>
         {readyToRestart ? (
           <button
@@ -46,7 +52,7 @@ export default function UpdateBanner() {
               borderRadius: "var(--rounded-pill)",
               cursor: "pointer",
             }}
-            onClick={restartApp}
+            onClick={() => { restartApp(); }}
           >
             Restart
           </button>
