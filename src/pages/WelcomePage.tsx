@@ -5,6 +5,7 @@ import type { CreateWalletResult } from "../api";
 import { useBackend } from "../hooks/useBackend";
 import PasswordInput from "../components/PasswordInput";
 import { track, TrackEvent } from "../tracking";
+import { useI18n } from "../i18n";
 
 type Step =
   | "checking"
@@ -15,6 +16,7 @@ type Step =
   | "logging-in";
 
 export default function WelcomePage() {
+  const { t } = useI18n();
   const { backendUrl } = useBackend();
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("checking");
@@ -46,7 +48,7 @@ export default function WelcomePage() {
       navigate("/market", { replace: true });
     } catch (e) {
       setStep("no-wallet");
-      setError("Auto-login failed. Create or import a wallet.");
+      setError(t("welcome.autoLoginFailed"));
     }
   }
 
@@ -67,7 +69,7 @@ export default function WelcomePage() {
 
   async function handleImport() {
     setError("");
-    if (!importPhrase.trim()) { setError("Enter your mnemonic phrase"); return; }
+    if (!importPhrase.trim()) { setError(t("welcome.enterMnemonic")); return; }
     setLoading(true);
     try {
       const r = await walletImport(importPhrase, password);
@@ -102,7 +104,7 @@ export default function WelcomePage() {
         <div className="welcome-card" style={{ textAlign: "center" }}>
           <img src="/logo.svg" alt="" className="welcome-logo" />
           <div className="welcome-loader" />
-          <p className="text-muted" style={{ marginTop: "var(--space-md)" }}>Loading...</p>
+          <p className="text-muted" style={{ marginTop: "var(--space-md)" }}>{t("common.loading")}</p>
         </div>
       </div>
     );
@@ -116,7 +118,7 @@ export default function WelcomePage() {
         <div className="welcome-card" style={{ textAlign: "center" }}>
           <img src="/logo.svg" alt="" className="welcome-logo" />
           <div className="welcome-loader" />
-          <p style={{ marginTop: "var(--space-md)", fontWeight: 500 }}>Signing in...</p>
+          <p style={{ marginTop: "var(--space-md)", fontWeight: 500 }}>{t("welcome.signingIn")}</p>
           <p className="text-muted" style={{ fontSize: 12 }}>{walletAddr.slice(0, 10)}...{walletAddr.slice(-6)}</p>
         </div>
       </div>
@@ -130,17 +132,17 @@ export default function WelcomePage() {
         <div className="welcome-bg" />
         <div className="welcome-card">
           <img src="/logo.svg" alt="" className="welcome-logo" />
-          <h1 className="welcome-title">Welcome to ProxyBase</h1>
+          <h1 className="welcome-title">{t("welcome.title")}</h1>
           <p className="welcome-sub">
-            A decentralized peer-to-peer bandwidth marketplace. Buy and sell proxy access using cryptocurrency deposits.
+            {t("welcome.subtitle")}
           </p>
           {error && <div className="alert alert-error" style={{ marginTop: "var(--space-md)" }}>{error}</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: "var(--space-xl)" }}>
             <button className="btn btn-primary btn-lg" onClick={() => setStep("create")}>
-              Create New Wallet
+              {t("welcome.createWallet")}
             </button>
             <button className="btn btn-secondary btn-lg" onClick={() => setStep("import")}>
-              Import Existing Wallet
+              {t("welcome.importWallet")}
             </button>
           </div>
         </div>
@@ -155,21 +157,21 @@ export default function WelcomePage() {
         <div className="welcome-bg" />
         <div className="welcome-card">
           <img src="/logo.svg" alt="" className="welcome-logo" />
-          <h1 className="welcome-title">Create Wallet</h1>
-          <p className="welcome-sub">Generate a new BIP-39 wallet. Save your mnemonic securely.</p>
+          <h1 className="welcome-title">{t("welcome.createTitle")}</h1>
+          <p className="welcome-sub">{t("welcome.createDesc")}</p>
           {error && <div className="alert alert-error">{error}</div>}
           <PasswordInput
-            label="Encryption Password (optional)"
+            label={t("welcome.encryptionPassword")}
             value={password}
             onChange={setPassword}
-            placeholder="Leave empty for no password"
+            placeholder={t("welcome.passwordPlaceholder")}
           />
           <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-lg)" }}>
             <button className="btn btn-primary btn-lg" style={{ flex: 1 }} onClick={handleCreate} disabled={loading}>
-              {loading ? "Creating..." : "Create"}
+              {loading ? t("common.creating") : t("common.create")}
             </button>
             <button className="btn btn-secondary btn-lg" onClick={() => { setStep("no-wallet"); setError(""); }}>
-              Back
+              {t("common.back")}
             </button>
           </div>
         </div>
@@ -184,10 +186,10 @@ export default function WelcomePage() {
       <div className="welcome-screen">
         <div className="welcome-bg" />
         <div className="welcome-card">
-          <div className="badge badge-success" style={{ marginBottom: "var(--space-sm)" }}>Wallet Created</div>
-          <h1 className="welcome-title" style={{ fontSize: 22 }}>Save Your Mnemonic</h1>
+          <div className="badge badge-success" style={{ marginBottom: "var(--space-sm)" }}>{t("welcome.walletCreated")}</div>
+          <h1 className="welcome-title" style={{ fontSize: 22 }}>{t("welcome.saveMnemonic")}</h1>
           <p className="welcome-sub">
-            Write these 12 words down in order. Anyone with this phrase can access your wallet. Never share it.
+            {t("welcome.saveMnemonicDesc")}
           </p>
           {error && <div className="alert alert-error" style={{ marginTop: "var(--space-sm)" }}>{error}</div>}
           <div className="mnemonic-display" style={{ marginTop: "var(--space-md)" }}>
@@ -200,7 +202,7 @@ export default function WelcomePage() {
           </div>
           <button className="btn btn-primary btn-lg" style={{ marginTop: "var(--space-xl)", width: "100%" }}
             onClick={handleContinueAfterCreate} disabled={loading}>
-            {loading ? "Signing in..." : "Continue"}
+            {loading ? t("welcome.signingIn") : t("welcome.continue")}
           </button>
         </div>
       </div>
@@ -213,32 +215,32 @@ export default function WelcomePage() {
       <div className="welcome-bg" />
       <div className="welcome-card">
         <img src="/logo.svg" alt="" className="welcome-logo" />
-        <h1 className="welcome-title">Import Wallet</h1>
-        <p className="welcome-sub">Restore your wallet from a BIP-39 mnemonic phrase.</p>
+        <h1 className="welcome-title">{t("welcome.importTitle")}</h1>
+        <p className="welcome-sub">{t("welcome.importDesc")}</p>
         {error && <div className="alert alert-error">{error}</div>}
         <div className="form-group" style={{ marginTop: "var(--space-md)" }}>
-          <label className="form-label">12-word Mnemonic Phrase</label>
+          <label className="form-label">{t("welcome.mnemonicPhrase")}</label>
           <textarea
             className="form-input"
             rows={3}
             value={importPhrase}
             onChange={(e) => setImportPhrase(e.target.value)}
-            placeholder="Enter the 12 words separated by spaces..."
+            placeholder={t("welcome.mnemonicPlaceholder")}
           />
         </div>
         <PasswordInput
-          label="Encryption Password (optional)"
+          label={t("welcome.encryptionPassword")}
           value={password}
           onChange={setPassword}
-          placeholder="Leave empty for no password"
+          placeholder={t("welcome.passwordPlaceholder")}
         />
         <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-lg)" }}>
           <button className="btn btn-primary btn-lg" style={{ flex: 1 }}
             onClick={handleImport} disabled={loading}>
-            {loading ? "Importing..." : "Import & Login"}
+            {loading ? t("welcome.importing") : t("welcome.importAndLogin")}
           </button>
           <button className="btn btn-secondary btn-lg" onClick={() => { setStep("no-wallet"); setError(""); }}>
-            Back
+            {t("common.back")}
           </button>
         </div>
       </div>

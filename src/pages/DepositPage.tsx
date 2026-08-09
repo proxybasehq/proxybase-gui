@@ -5,6 +5,7 @@ import { getDeposit } from "../api";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
 import { formatUsd } from "../utils";
+import { useI18n } from "../i18n";
 
 const DEPOSIT_TIMEOUT_SECS = 9 * 60;
 const POLL_INTERVAL_MS = 10_000;
@@ -24,6 +25,7 @@ let _pendingDeposit: DepositState | null = null;
 export function setPendingDeposit(s: DepositState) { _pendingDeposit = s; }
 
 export default function DepositPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { backendUrl } = useBackend();
   const { isAuthenticated } = useOutletContext<AppContext>();
@@ -106,44 +108,44 @@ export default function DepositPage() {
       {step === "created" && (
         <div className="card" style={{ textAlign: "center" }}>
           <div className="alert alert-success" style={{ justifyContent: "center", marginBottom: 8 }}>
-            Deposit created — send the exact amount shown
+            {t("depositPage.created")}
           </div>
 
           {state.qrDataUrl && (
             <div style={{ marginBottom: 8 }}>
-              <img src={state.qrDataUrl} alt="Payment QR"
+              <img src={state.qrDataUrl} alt={t("depositPage.paymentQr")}
                 style={{ border: "1px solid var(--color-hairline)", borderRadius: "var(--rounded-sm)", width: 120, height: 120 }} />
             </div>
           )}
           <table style={{ marginBottom: 8 }}><tbody>
             <tr onClick={() => copyToClipboard(state.pay_address, "Address")} style={{ cursor: "pointer" }}>
-              <td style={{ color: "var(--color-mute)", fontSize: 10, padding: "1px 4px 1px 0", whiteSpace: "nowrap" }}>Address</td>
+              <td style={{ color: "var(--color-mute)", fontSize: 10, padding: "1px 4px 1px 0", whiteSpace: "nowrap" }}>{t("depositPage.address")}</td>
               <td className="font-mono" style={{ fontSize: 10, wordBreak: "break-all", padding: "1px 0" }}>
                 {state.pay_address}
-                {copied === "Address" && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 9 }}>Copied!</span>}
+                {copied === "Address" && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 9 }}>{t("common.copied")}</span>}
               </td>
             </tr>
             <tr onClick={() => copyToClipboard(state.pay_currency, "Currency")} style={{ cursor: "pointer" }}>
-              <td style={{ color: "var(--color-mute)", fontSize: 10, padding: "1px 4px 1px 0" }}>Currency</td>
+              <td style={{ color: "var(--color-mute)", fontSize: 10, padding: "1px 4px 1px 0" }}>{t("depositPage.currency")}</td>
               <td className="font-mono" style={{ fontSize: 10, padding: "1px 0" }}>
                 {state.pay_currency}
-                {copied === "Currency" && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 9 }}>Copied!</span>}
+                {copied === "Currency" && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 9 }}>{t("common.copied")}</span>}
               </td>
             </tr>
             {state.pay_amount != null && (
               <tr onClick={() => copyToClipboard(String(state.pay_amount), "Amount")} style={{ cursor: "pointer" }}>
-                <td style={{ color: "var(--color-mute)", fontSize: 10, padding: "1px 4px 1px 0" }}>Amount</td>
+                <td style={{ color: "var(--color-mute)", fontSize: 10, padding: "1px 4px 1px 0" }}>{t("depositPage.amount")}</td>
                 <td className="font-mono" style={{ fontSize: 10, padding: "1px 0" }}>
                   {state.pay_amount}
-                  {copied === "Amount" && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 9 }}>Copied!</span>}
+                  {copied === "Amount" && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 9 }}>{t("common.copied")}</span>}
                 </td>
               </tr>
             )}
             <tr onClick={() => copyToClipboard(state.deposit_id, "Deposit ID")} style={{ cursor: "pointer" }}>
-              <td style={{ color: "var(--color-mute)", fontSize: 10, padding: "1px 4px 1px 0" }}>Deposit ID</td>
+              <td style={{ color: "var(--color-mute)", fontSize: 10, padding: "1px 4px 1px 0" }}>{t("depositPage.depositId")}</td>
               <td className="font-mono" style={{ fontSize: 10, padding: "1px 0" }}>
                 {state.deposit_id}
-                {copied === "Deposit ID" && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 9 }}>Copied!</span>}
+                {copied === "Deposit ID" && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 9 }}>{t("common.copied")}</span>}
               </td>
             </tr>
           </tbody></table>
@@ -157,11 +159,11 @@ export default function DepositPage() {
             }}>
               {formatCountdown(countdown)}
             </span>
-            <div className="text-muted" style={{ fontSize: 10 }}>time remaining</div>
+            <div className="text-muted" style={{ fontSize: 10 }}>{t("depositPage.timeRemaining")}</div>
           </div>
 
           <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}>
-            Back
+            {t("common.back")}
           </button>
         </div>
       )}
@@ -169,21 +171,21 @@ export default function DepositPage() {
       {step === "completed" && result && (
         <div className="card" style={{ textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 4 }}>{'✅'}</div>
-          <div className="card-title" style={{ fontSize: 14 }}>Deposit Complete</div>
+          <div className="card-title" style={{ fontSize: 14 }}>{t("depositPage.complete")}</div>
           <table style={{ marginTop: 4, marginBottom: 8 }}><tbody>
             <tr>
-              <td style={{ color: "var(--color-mute)", fontSize: 11, padding: "1px 6px 1px 0" }}>Status</td>
+              <td style={{ color: "var(--color-mute)", fontSize: 11, padding: "1px 6px 1px 0" }}>{t("depositPage.status")}</td>
               <td className="font-mono" style={{ fontSize: 11, padding: "1px 0" }}>{(result as any).status || "completed"}</td>
             </tr>
             {(result as any).amount_microcredits != null && (
               <tr>
-                <td style={{ color: "var(--color-mute)", fontSize: 11, padding: "1px 6px 1px 0" }}>Credited</td>
+                <td style={{ color: "var(--color-mute)", fontSize: 11, padding: "1px 6px 1px 0" }}>{t("depositPage.credited")}</td>
                 <td className="font-mono" style={{ fontSize: 13, fontWeight: 600, padding: "1px 0" }}>{formatUsd((result as any).amount_microcredits)}</td>
               </tr>
             )}
           </tbody></table>
           <button className="btn btn-primary" onClick={() => navigate("/market", { replace: true })}>
-            Done
+            {t("depositPage.done")}
           </button>
         </div>
       )}
@@ -191,16 +193,16 @@ export default function DepositPage() {
       {step === "expired" && (
         <div className="card" style={{ textAlign: "center" }}>
           <div className="alert alert-error" style={{ justifyContent: "center" }}>
-            Payment time expired. Please create a new deposit.
+            {t("depositPage.expired")}
           </div>
           <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: 8 }}>
             <button className="btn btn-primary" style={{ flex: 1 }}
               onClick={() => navigate(-1)}>
-              Try Again
+              {t("depositPage.tryAgain")}
             </button>
             <button className="btn btn-secondary" style={{ flex: 1 }}
               onClick={() => navigate("/market", { replace: true })}>
-              Close
+              {t("depositPage.close")}
             </button>
           </div>
         </div>

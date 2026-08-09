@@ -1,0 +1,328 @@
+import type { Messages } from "../translations";
+
+const fr: Messages = {
+  "common.loading": "Chargement...",
+  "common.back": "Retour",
+  "common.close": "Fermer",
+  "common.cancel": "Annuler",
+  "common.refresh": "Actualiser",
+  "common.create": "Créer",
+  "common.creating": "Création...",
+  "common.copied": "Copié !",
+  "common.address": "Adresse",
+  "common.currency": "Devise",
+  "common.username": "Nom d'utilisateur",
+  "common.password": "Mot de passe",
+  "common.status": "Statut",
+  "common.country": "Pays",
+  "common.type": "Type",
+  "common.amount": "Montant",
+  "common.login": "Connexion",
+  "common.running": "En cours",
+  "common.reconnecting": "Reconnexion...",
+  "common.stopped": "Arrêté",
+  "common.support": "Assistance",
+  "common.direct": "Direct",
+  "common.other": "Autre",
+  "common.continue": "Continuer",
+
+  "nav.market": "Marché",
+  "nav.seller": "Vendeur",
+  "nav.faq": "FAQ",
+  "nav.login": "Connexion",
+  "nav.settings": "Paramètres",
+  "nav.account": "Compte",
+  "nav.discord": "Discord",
+
+  "status.authenticated": "Authentifié",
+  "status.notAuthenticated": "Non authentifié",
+
+  "welcome.title": "Bienvenue sur ProxyBase",
+  "welcome.subtitle":
+    "Un marché décentralisé d'accès à la bande passante entre pairs. Achetez et vendez un accès proxy avec des dépôts en cryptomonnaies.",
+  "welcome.createWallet": "Créer un nouveau portefeuille",
+  "welcome.importWallet": "Importer un portefeuille existant",
+  "welcome.createTitle": "Créer un portefeuille",
+  "welcome.createDesc":
+    "Générez un nouveau portefeuille BIP-39. Conservez votre phrase mnémonique en sécurité.",
+  "welcome.encryptionPassword": "Mot de passe de chiffrement (facultatif)",
+  "welcome.passwordPlaceholder": "Laisser vide pour aucun mot de passe",
+  "welcome.walletCreated": "Portefeuille créé",
+  "welcome.saveMnemonic": "Enregistrez votre phrase mnémonique",
+  "welcome.saveMnemonicDesc":
+    "Notez ces 12 mots dans l'ordre. Toute personne disposant de cette phrase peut accéder à votre portefeuille. Ne la partagez jamais.",
+  "welcome.signingIn": "Connexion...",
+  "welcome.continue": "Continuer",
+  "welcome.importTitle": "Importer un portefeuille",
+  "welcome.importDesc":
+    "Restaurez votre portefeuille à partir d'une phrase mnémonique BIP-39.",
+  "welcome.mnemonicPhrase": "Phrase mnémonique de 12 mots",
+  "welcome.mnemonicPlaceholder":
+    "Saisissez les 12 mots séparés par des espaces...",
+  "welcome.importing": "Importation...",
+  "welcome.importAndLogin": "Importer et se connecter",
+  "welcome.autoLoginFailed":
+    "La connexion automatique a échoué. Créez ou importez un portefeuille.",
+  "welcome.enterMnemonic": "Saisissez votre phrase mnémonique",
+
+  "login.title": "Connexion",
+  "login.desc":
+    "Authentifiez-vous avec votre portefeuille pour accéder au réseau ProxyBase.",
+  "login.noWallet": "Aucun portefeuille trouvé",
+  "login.noWalletDesc":
+    "Créez ou importez d'abord un portefeuille depuis la page Portefeuille.",
+  "login.authenticate": "S'authentifier",
+  "login.walletAddress": "Adresse du portefeuille",
+  "login.walletPassword": "Mot de passe du portefeuille",
+  "login.passwordPlaceholder":
+    "Saisissez le mot de passe de chiffrement du portefeuille (laisser vide si aucun)",
+  "login.authenticating": "Authentification...",
+  "login.successful": "Connexion réussie",
+  "login.role": "Rôle :",
+  "login.buyerAvailable": "Disponible acheteur :",
+  "login.spendableBalance": "Solde dépensable :",
+
+  "wallet.title": "Portefeuille",
+  "wallet.desc": "Gérez votre identité de portefeuille ProxyBase.",
+  "wallet.info": "Infos",
+  "wallet.create": "Créer",
+  "wallet.import": "Importer",
+  "wallet.status": "État du portefeuille",
+  "wallet.addressLabel": "Adresse :",
+  "wallet.loaded": "Chargé",
+  "wallet.noWallet": "Aucun portefeuille trouvé. Créez-en un ou importez-en un.",
+  "wallet.clickInfo":
+    "Cliquez sur Infos pour vérifier l'état du portefeuille.",
+  "wallet.createNew": "Créer un nouveau portefeuille",
+  "wallet.encryptionPassword": "Mot de passe de chiffrement (facultatif)",
+  "wallet.passwordPlaceholder": "Laisser vide pour aucun mot de passe",
+  "wallet.createWallet": "Créer un portefeuille",
+  "wallet.creating": "Création...",
+  "wallet.walletAddress": "Adresse du portefeuille",
+  "wallet.mnemonic": "Phrase mnémonique — À CONSERVER EN SÉCURITÉ",
+  "wallet.mnemonicWarning":
+    "Notez ces 12 mots dans l'ordre. Toute personne disposant de cette phrase peut accéder à votre portefeuille.",
+  "wallet.importFromMnemonic": "Importer depuis une phrase mnémonique",
+  "wallet.mnemonicPhrase": "Phrase mnémonique de 12 mots",
+  "wallet.mnemonicPlaceholder":
+    "Saisissez les 12 mots séparés par des espaces...",
+  "wallet.importing": "Importation...",
+  "wallet.importWallet": "Importer un portefeuille",
+  "wallet.imported": "Importé",
+
+  "market.title": "Marché",
+  "market.desc": "Parcourez les pays, les tarifs et gérez vos sessions proxy.",
+  "market.prices": "Tarifs",
+  "market.activeSessions": "Sessions actives",
+  "market.insufficientBalance": "Solde insuffisant",
+  "market.insufficientDesc":
+    "Vos fonds sont insuffisants. Déposez des cryptomonnaies pour continuer.",
+  "market.depositFunds": "Déposer des fonds",
+  "market.dismiss": "Ignorer",
+  "market.connectionDetails": "Détails de connexion du proxy",
+  "market.remote": "Distant",
+  "market.localBridge": "Pont local",
+  "market.proxyAddress": "Adresse du proxy",
+  "market.sessionId": "ID de session",
+  "market.password": "Mot de passe",
+  "market.country": "Pays",
+  "market.type": "Type",
+  "market.exampleCurl": "Exemple (curl)",
+  "market.localBridgeDesc":
+    "Utilisez le pont local pour les applications comme Chrome qui ne prennent pas en charge les proxys authentifiés.",
+  "market.auth": "Authentification",
+  "market.noneRequired": "Aucune requise",
+  "market.exampleCurlLocal": "Exemple (curl • local)",
+  "market.bridgeNotRunning":
+    "Le pont n'est pas actif. La session a peut-être été achetée depuis un autre appareil.",
+  "market.pricing": "Tarification",
+  "market.refresh": "Actualiser",
+  "market.loadingPricing": "Chargement des tarifs...",
+  "market.category": "Catégorie",
+  "market.price": "Prix",
+  "market.buying": "Achat...",
+  "market.buy": "Acheter",
+  "market.noSellers": "Aucun vendeur disponible.",
+  "market.activeSessionsCount": "Sessions actives ({count})",
+  "market.noActiveSessions":
+    "Aucune session active. Achetez-en une dans l'onglet Tarifs.",
+  "market.mode": "Mode",
+  "market.closeSession": "Fermer la session",
+
+  "seller.title": "Vendeur",
+  "seller.desc":
+    "Commencez à vendre votre bande passante sur le marché ProxyBase.",
+  "seller.status": "État du vendeur",
+  "seller.refreshStatus": "Actualiser l'état",
+  "seller.startStop": "Démarrer / arrêter le vendeur",
+  "seller.includeDirect":
+    "Inclure la connexion directe (vendre votre propre bande passante)",
+  "seller.upstreamProxies": "Proxys amont (revente)",
+  "seller.hostPort": "Hôte:Port",
+  "seller.username": "Nom d'utilisateur",
+  "seller.password": "Mot de passe",
+  "seller.remove": "Supprimer",
+  "seller.addUpstream": "+ Ajouter un proxy amont",
+  "seller.startSeller": "Démarrer le vendeur",
+  "seller.stopSeller": "Arrêter le vendeur",
+  "seller.activeStreams": "Flux actifs ({count})",
+  "seller.noStreams": "Aucun flux actif. En attente de connexions...",
+  "seller.sessionId": "ID de session",
+  "seller.target": "Cible",
+  "seller.route": "Route",
+  "seller.proxyN": "Proxy #{n}",
+
+  "deposit.title": "Dépôts",
+  "deposit.desc": "Créez des dépôts et vérifiez leur statut.",
+  "deposit.create": "Créer un dépôt",
+  "deposit.amountUsd": "Montant ($USD)",
+  "deposit.currency": "Devise",
+  "deposit.createAction": "Créer",
+  "deposit.creating": "Création...",
+  "deposit.checkStatus": "Vérifier le statut du dépôt",
+  "deposit.depositId": "ID du dépôt",
+  "deposit.enterDepositId": "Saisissez l'ID du dépôt...",
+  "deposit.checkStatusAction": "Vérifier le statut",
+  "deposit.invalidAmount": "Montant invalide",
+
+  "depositPage.created":
+    "Dépôt créé — envoyez exactement le montant indiqué",
+  "depositPage.paymentQr": "QR de paiement",
+  "depositPage.address": "Adresse",
+  "depositPage.currency": "Devise",
+  "depositPage.amount": "Montant",
+  "depositPage.depositId": "ID du dépôt",
+  "depositPage.timeRemaining": "temps restant",
+  "depositPage.complete": "Dépôt terminé",
+  "depositPage.status": "Statut",
+  "depositPage.credited": "Crédité",
+  "depositPage.done": "Terminé",
+  "depositPage.expired":
+    "Le délai de paiement a expiré. Veuillez créer un nouveau dépôt.",
+  "depositPage.tryAgain": "Réessayer",
+  "depositPage.close": "Fermer",
+
+  "account.wallet": "Portefeuille",
+  "account.address": "Adresse",
+  "account.viewBalance": "Voir le solde",
+  "account.manageWallet": "Gérer le portefeuille",
+  "account.addFunds": "Ajouter des fonds",
+  "account.noWallet": "Aucun portefeuille chargé.",
+  "account.seller": "Vendeur",
+  "account.streamsOne": "{count} flux actif",
+  "account.streamsOther": "{count} flux actifs",
+  "account.sellerSettings": "Paramètres du vendeur",
+  "account.system": "Système",
+  "account.dataDir": "Dossier de données",
+  "account.walletPath": "Portefeuille",
+  "account.sessionPath": "Session",
+  "account.configPath": "Configuration",
+  "account.version": "Version",
+  "account.logout": "Déconnexion",
+  "account.logoutWarning":
+    "Toutes les sessions actives seront fermées et le vendeur sera arrêté.",
+  "account.walletBalance": "Solde du portefeuille",
+  "account.failedBalance": "Impossible de charger le solde.",
+  "account.appInfo": "Infos de l'application",
+  "account.spendable": "Dépensable",
+  "account.buyerAvailable": "Disponible acheteur",
+  "account.buyerReserved": "Réservé acheteur",
+  "account.buyerSpent": "Dépensé acheteur",
+  "account.sellerPending": "En attente vendeur",
+  "account.sellerAvailable": "Disponible vendeur",
+  "account.payoutLocked": "Paiement bloqué",
+
+  "faq.title": "FAQ",
+  "faq.desc": "Questions fréquentes sur ProxyBase Markets.",
+  "faq.q1": "Qu'est-ce que ProxyBase Markets ?",
+  "faq.a1":
+    "ProxyBase Markets est un marché décentralisé de bande passante entre pairs. Les vendeurs proposent leur connexion Internet comme sortie proxy, et les acheteurs accèdent à ces proxys pour le scraping web, la navigation par agents IA et d'autres trafics automatisés. Tous les paiements sont réglés en microcrédits adossés à des dépôts en cryptomonnaies.",
+  "faq.q2": "Comment commencer à vendre ma bande passante ?",
+  "faq.a2":
+    "Allez dans l'onglet Vendeur, configurez vos proxys amont (facultatif) et cliquez sur « Démarrer le vendeur ». Votre nœud s'enregistre sur le marché et reçoit des sondes QoS. Après les contrôles de qualité, votre connexion est classée par pays et type de réseau, puis devient achetable par les acheteurs. Vous gagnez des crédits pour chaque Go de trafic relayé.",
+  "faq.q3": "Quels sont les types de réseau ?",
+  "faq.a3":
+    "ProxyBase classe les connexions des vendeurs en cinq types : Résidentiel (FAI domestique), Mobile (opérateur cellulaire), Datacenter (IP cloud/colo), FAI (IP professionnelles/statiques) et Jetable (IP VPN/tor/proxy). Les IP jetables sont signalées lors des sondes QoS et peuvent recevoir des tarifs plus bas ou être restreintes pour certains groupes d'acheteurs.",
+  "faq.q4": "Comment acheter une session proxy ?",
+  "faq.a4":
+    "Allez dans l'onglet Marché → Tarifs. Trouvez un pays et un type de réseau avec des vendeurs disponibles, puis cliquez sur le bouton vert « Acheter » de cette ligne. Une session proxy SOCKS5 est créée et apparaît sous l'onglet « Sessions actives ». Votre solde est débité par Go de trafic utilisé. Fermez une session à tout moment en cliquant sur le X de sa ligne.",
+  "faq.q5": "Comment fonctionnent les microcrédits et la tarification ?",
+  "faq.a5":
+    "1 000 000 de microcrédits = 1,00 USD. Le prix est fixé par pays et type de réseau (ex. 0,50 $/Go pour le résidentiel américain). Les vendeurs gagnent des crédits lorsque les acheteurs utilisent leurs proxys. Vous pouvez déposer des fonds en cryptomonnaies (BTC, USDC, USDT, SOL, etc.) via NOWPayments.",
+  "faq.q6": "Qu'est-ce qu'un dépôt et comment en créer un ?",
+  "faq.a6":
+    "Ouvrez la page Compte depuis l'icône d'en-tête, puis appuyez sur « Ajouter des fonds ». Choisissez un montant (10, 20, 100 $ ou personnalisé) et une cryptomonnaie. Après la création, vous accédez à une page de dépôt avec l'adresse de paiement, le code QR et un compte à rebours de 9 minutes. Envoyez exactement le montant indiqué à cette adresse — votre solde se met à jour automatiquement une fois confirmé.",
+  "faq.q7": "Comment vérifier le solde de mon portefeuille ?",
+  "faq.a7":
+    "Allez sur la page Compte et appuyez sur « Voir le solde ». Vos soldes s'affichent : solde dépensable, disponible/réservé/dépensé côté acheteur, et gains en attente/disponibles/bloqués côté vendeur.",
+  "faq.q8": "Que se passe-t-il quand je ferme l'application ?",
+  "faq.a8":
+    "L'application continue de tourner dans la barre d'état système. Fermer la fenêtre la masque — cela ne quitte pas l'application. Cliquez sur l'icône de la barre pour l'afficher ou la masquer. Si vous vendiez de la bande passante, votre session de vendeur persiste et redémarre automatiquement au prochain lancement. L'application s'enregistre aussi en démarrage automatique au boot.",
+  "faq.q9": "Comment créer un portefeuille ?",
+  "faq.a9":
+    "L'écran de bienvenue vous guide dans la création du portefeuille au premier lancement. Pour le gérer ensuite, allez dans la page Compte → « Gérer le portefeuille ». Utilisez l'onglet « Créer » pour générer une nouvelle phrase mnémonique BIP-39 (12 mots), ou « Importer » pour restaurer depuis une phrase existante. Conservez ces mots en sécurité : ils sont le seul moyen de récupérer votre portefeuille. Vos données sont stockées dans ~/.proxybase/.",
+  "faq.q10": "L'application se connecte-t-elle automatiquement ?",
+  "faq.a10":
+    "Oui. Au lancement, l'écran de bienvenue détecte votre portefeuille existant et vous connecte automatiquement si aucun mot de passe n'est défini. Si vous avez défini un mot de passe de portefeuille, vous devrez le saisir sur la page de connexion.",
+  "faq.q11": "Quelles données sont stockées sur ma machine ?",
+  "faq.a11":
+    "Tout est stocké dans ~/.proxybase/ : votre fichier de clés chiffré (wallet/keyfile.enc), le jeton de session (session_token) et la configuration (config.toml). Aucune clé privée n'est jamais envoyée au backend — l'authentification utilise des signatures cryptographiques de votre portefeuille local.",
+  "faq.q12":
+    "Qu'est-ce que les sondes QoS et comment affectent-elles mon statut de vendeur ?",
+  "faq.a12":
+    "Les sondes de qualité de service sont des tests automatisés lancés par le marché pour vérifier la vitesse, la latence et la fiabilité de votre connexion. Les sondes passent par votre relais, mesurent la latence et la disponibilité, et classent votre IP (pays, FAI, type de réseau). Les vendeurs qui échouent sont suspendus. De bonnes performances constantes mènent à la promotion du pool d'essai vers la production.",
+  "faq.q13": "Quels sont les niveaux du pool de vendeurs ?",
+  "faq.a13":
+    "Essai : nouveaux vendeurs en évaluation QoS. Production : vendeurs vérifiés et fiables — prioritaires pour les sessions des acheteurs. Suspendu : vendeurs ayant échoué aux sondes ou hors ligne — réévalués automatiquement après une période de blocage.",
+  "faq.q14":
+    "Comment utiliser le proxy SOCKS5 après l'achat d'une session ?",
+  "faq.a14":
+    "Cliquez sur une ligne de session dans l'onglet Sessions actives pour voir les détails de connexion. Configurez votre application pour utiliser un proxy SOCKS5 sur {proxyAddress} avec l'ID de session comme nom d'utilisateur et votre jeton de session comme mot de passe. Exemple : curl.exe --socks5 {proxyAddress} --proxy-user ID_SESSION:JETON https://example.com (utilisez curl sur macOS/Linux)",
+  "faq.q15": "Que deviennent mes sessions quand je me déconnecte ?",
+  "faq.a15":
+    "La déconnexion depuis la page Compte ferme toutes les sessions proxy acheteur actives et arrête la connexion vendeur si elle tourne. Votre jeton de session est supprimé du disque.",
+  "faq.q16":
+    "Comment me connecter via un proxy amont pour la revente ?",
+  "faq.a16":
+    "Dans l'onglet Vendeur, ajoutez des proxys amont dans la section « Proxys amont ». Chaque entrée a un hôte:port, un nom d'utilisateur et un mot de passe. Le vendeur relaie le trafic via ces proxys amont au lieu de (ou en plus de) votre propre connexion. Cochez « Inclure la connexion directe » pour vendre aussi votre propre bande passante. Le backend répartit les flux sur tous les chemins avec un hachage round-robin.",
+  "faq.q17": "À quoi sert Discord ?",
+  "faq.a17":
+    "L'icône Discord de l'en-tête mène au serveur communautaire ProxyBase (discord.gg/7uedk7ajHD). Rejoignez-le pour l'assistance, les annonces et les discussions avec les autres vendeurs et acheteurs.",
+  "faq.q18": "Où voir mon statut de vendeur et les infos système ?",
+  "faq.a18":
+    "Tout est sur la page Compte — appuyez sur l'icône personne en haut à droite. Vous y trouverez votre statut de connexion, l'adresse et le solde du portefeuille, l'état du vendeur avec le nombre de flux actifs, les chemins des fichiers système et la version de l'application.",
+
+  "layout.createDeposit": "Créer un dépôt",
+  "layout.amount": "Montant",
+  "layout.other": "Autre",
+  "layout.enterAmount": "Saisissez un montant...",
+  "layout.currency": "Devise",
+  "layout.creating": "Création...",
+  "layout.createDepositAction": "Créer un dépôt",
+  "layout.cancel": "Annuler",
+  "layout.enterValidAmount": "Saisissez un montant valide",
+  "layout.amountTooSmall":
+    "Le montant est trop petit. Le minimum est fixé par le prestataire de paiement. Essayez un montant plus élevé.",
+
+  "update.ready":
+    "Mise à jour v{version} prête. Redémarrez pour l'appliquer.",
+  "update.downloading": "Téléchargement de la mise à jour ({percent}%)...",
+  "update.available": "v{version} disponible",
+  "update.restartFailed":
+    "Le redémarrage a échoué — cliquez à nouveau sur Redémarrer ou relancez manuellement.",
+  "update.restart": "Redémarrer",
+  "update.update": "Mettre à jour",
+
+  "password.show": "AFFICHER",
+  "password.hide": "MASQUER",
+
+  "settings.title": "Paramètres",
+  "settings.desc": "Préférences de l'application et langue.",
+  "settings.language": "Langue",
+  "settings.languageDesc":
+    "Choisissez la langue utilisée dans toute l'application. Par défaut, elle suit la langue du système.",
+  "settings.followSystem": "Suivre la langue du système",
+  "settings.systemLangLabel": "Système ({lang})",
+};
+
+export default fr;

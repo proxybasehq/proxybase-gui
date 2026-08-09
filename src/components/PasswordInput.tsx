@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../i18n";
 
 interface PasswordInputProps {
   value: string;
@@ -8,6 +9,7 @@ interface PasswordInputProps {
 }
 
 export default function PasswordInput({ value, onChange, placeholder, label }: PasswordInputProps) {
+  const { t } = useI18n();
   const [show, setShow] = useState(false);
 
   return (
@@ -38,7 +40,7 @@ export default function PasswordInput({ value, onChange, placeholder, label }: P
             fontFamily: "var(--font-mono)",
           }}
         >
-          {show ? "HIDE" : "SHOW"}
+          {show ? t("password.hide") : t("password.show")}
         </button>
       </div>
     </div>

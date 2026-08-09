@@ -1,0 +1,326 @@
+import type { Messages } from "../translations";
+
+const es: Messages = {
+  "common.loading": "Cargando...",
+  "common.back": "Atrás",
+  "common.close": "Cerrar",
+  "common.cancel": "Cancelar",
+  "common.refresh": "Actualizar",
+  "common.create": "Crear",
+  "common.creating": "Creando...",
+  "common.copied": "¡Copiado!",
+  "common.address": "Dirección",
+  "common.currency": "Moneda",
+  "common.username": "Usuario",
+  "common.password": "Contraseña",
+  "common.status": "Estado",
+  "common.country": "País",
+  "common.type": "Tipo",
+  "common.amount": "Cantidad",
+  "common.login": "Iniciar sesión",
+  "common.running": "En ejecución",
+  "common.reconnecting": "Reconectando...",
+  "common.stopped": "Detenido",
+  "common.support": "Soporte",
+  "common.direct": "Directo",
+  "common.other": "Otro",
+  "common.continue": "Continuar",
+
+  "nav.market": "Mercado",
+  "nav.seller": "Vendedor",
+  "nav.faq": "FAQ",
+  "nav.login": "Iniciar sesión",
+  "nav.settings": "Ajustes",
+  "nav.account": "Cuenta",
+  "nav.discord": "Discord",
+
+  "status.authenticated": "Autenticado",
+  "status.notAuthenticated": "No autenticado",
+
+  "welcome.title": "Bienvenido a ProxyBase",
+  "welcome.subtitle":
+    "Un mercado descentralizado de ancho de banda entre pares. Compra y vende acceso a proxies mediante depósitos en criptomonedas.",
+  "welcome.createWallet": "Crear nueva cartera",
+  "welcome.importWallet": "Importar cartera existente",
+  "welcome.createTitle": "Crear cartera",
+  "welcome.createDesc":
+    "Genera una nueva cartera BIP-39. Guarda tu frase mnemotécnica de forma segura.",
+  "welcome.encryptionPassword": "Contraseña de cifrado (opcional)",
+  "welcome.passwordPlaceholder": "Déjalo vacío si no quieres contraseña",
+  "welcome.walletCreated": "Cartera creada",
+  "welcome.saveMnemonic": "Guarda tu frase mnemotécnica",
+  "welcome.saveMnemonicDesc":
+    "Escribe estas 12 palabras en orden. Quien tenga esta frase puede acceder a tu cartera. Nunca la compartas.",
+  "welcome.signingIn": "Iniciando sesión...",
+  "welcome.continue": "Continuar",
+  "welcome.importTitle": "Importar cartera",
+  "welcome.importDesc":
+    "Restaura tu cartera desde una frase mnemotécnica BIP-39.",
+  "welcome.mnemonicPhrase": "Frase mnemotécnica de 12 palabras",
+  "welcome.mnemonicPlaceholder":
+    "Introduce las 12 palabras separadas por espacios...",
+  "welcome.importing": "Importando...",
+  "welcome.importAndLogin": "Importar e iniciar sesión",
+  "welcome.autoLoginFailed":
+    "El inicio de sesión automático falló. Crea o importa una cartera.",
+  "welcome.enterMnemonic": "Introduce tu frase mnemotécnica",
+
+  "login.title": "Iniciar sesión",
+  "login.desc":
+    "Autentícate con tu cartera para acceder a la red ProxyBase.",
+  "login.noWallet": "No se encontró cartera",
+  "login.noWalletDesc":
+    "Crea o importa una cartera desde la página Cartera.",
+  "login.authenticate": "Autenticar",
+  "login.walletAddress": "Dirección de la cartera",
+  "login.walletPassword": "Contraseña de la cartera",
+  "login.passwordPlaceholder":
+    "Introduce la contraseña de cifrado de la cartera (déjala vacía si no tiene)",
+  "login.authenticating": "Autenticando...",
+  "login.successful": "Inicio de sesión correcto",
+  "login.role": "Rol:",
+  "login.buyerAvailable": "Disponible para comprador:",
+  "login.spendableBalance": "Saldo disponible:",
+
+  "wallet.title": "Cartera",
+  "wallet.desc": "Gestiona tu identidad de cartera ProxyBase.",
+  "wallet.info": "Información",
+  "wallet.create": "Crear",
+  "wallet.import": "Importar",
+  "wallet.status": "Estado de la cartera",
+  "wallet.addressLabel": "Dirección:",
+  "wallet.loaded": "Cargada",
+  "wallet.noWallet": "No se encontró ninguna cartera. Crea o importa una.",
+  "wallet.clickInfo":
+    "Haz clic en Información para comprobar el estado de la cartera.",
+  "wallet.createNew": "Crear nueva cartera",
+  "wallet.encryptionPassword": "Contraseña de cifrado (opcional)",
+  "wallet.passwordPlaceholder": "Déjalo vacío si no quieres contraseña",
+  "wallet.createWallet": "Crear cartera",
+  "wallet.creating": "Creando...",
+  "wallet.walletAddress": "Dirección de la cartera",
+  "wallet.mnemonic": "Frase mnemotécnica — GUÁRDALA CON SEGURIDAD",
+  "wallet.mnemonicWarning":
+    "Escribe estas 12 palabras en orden. Quien tenga esta frase puede acceder a tu cartera.",
+  "wallet.importFromMnemonic": "Importar desde frase mnemotécnica",
+  "wallet.mnemonicPhrase": "Frase mnemotécnica de 12 palabras",
+  "wallet.mnemonicPlaceholder":
+    "Introduce las 12 palabras separadas por espacios...",
+  "wallet.importing": "Importando...",
+  "wallet.importWallet": "Importar cartera",
+  "wallet.imported": "Importada",
+
+  "market.title": "Mercado",
+  "market.desc": "Explora países, precios y gestiona sesiones de proxy.",
+  "market.prices": "Precios",
+  "market.activeSessions": "Sesiones activas",
+  "market.insufficientBalance": "Saldo insuficiente",
+  "market.insufficientDesc":
+    "No tienes fondos suficientes. Deposita criptomonedas para continuar.",
+  "market.depositFunds": "Depositar fondos",
+  "market.dismiss": "Descartar",
+  "market.connectionDetails": "Detalles de conexión del proxy",
+  "market.remote": "Remoto",
+  "market.localBridge": "Puente local",
+  "market.proxyAddress": "Dirección del proxy",
+  "market.sessionId": "ID de sesión",
+  "market.password": "Contraseña",
+  "market.country": "País",
+  "market.type": "Tipo",
+  "market.exampleCurl": "Ejemplo (curl)",
+  "market.localBridgeDesc":
+    "Usa el puente local para aplicaciones como Chrome que no admiten proxies autenticados.",
+  "market.auth": "Autenticación",
+  "market.noneRequired": "No se requiere",
+  "market.exampleCurlLocal": "Ejemplo (curl • local)",
+  "market.bridgeNotRunning":
+    "El puente no está en ejecución. La sesión puede haberse comprado desde otro dispositivo.",
+  "market.pricing": "Precios",
+  "market.refresh": "Actualizar",
+  "market.loadingPricing": "Cargando datos de precios...",
+  "market.category": "Categoría",
+  "market.price": "Precio",
+  "market.buying": "Comprando...",
+  "market.buy": "Comprar",
+  "market.noSellers": "No hay vendedores disponibles.",
+  "market.activeSessionsCount": "Sesiones activas ({count})",
+  "market.noActiveSessions":
+    "No hay sesiones activas. Compra una en la pestaña Precios.",
+  "market.mode": "Modo",
+  "market.closeSession": "Cerrar sesión",
+
+  "seller.title": "Vendedor",
+  "seller.desc": "Empieza a vender tu ancho de banda en el mercado ProxyBase.",
+  "seller.status": "Estado del vendedor",
+  "seller.refreshStatus": "Actualizar estado",
+  "seller.startStop": "Iniciar / detener vendedor",
+  "seller.includeDirect":
+    "Incluir conexión directa (vender tu propio ancho de banda)",
+  "seller.upstreamProxies": "Proxies ascendentes (reventa)",
+  "seller.hostPort": "Host:Puerto",
+  "seller.username": "Usuario",
+  "seller.password": "Contraseña",
+  "seller.remove": "Eliminar",
+  "seller.addUpstream": "+ Añadir proxy ascendente",
+  "seller.startSeller": "Iniciar vendedor",
+  "seller.stopSeller": "Detener vendedor",
+  "seller.activeStreams": "Flujos activos ({count})",
+  "seller.noStreams": "No hay flujos activos. Esperando conexiones...",
+  "seller.sessionId": "ID de sesión",
+  "seller.target": "Destino",
+  "seller.route": "Ruta",
+  "seller.proxyN": "Proxy #{n}",
+
+  "deposit.title": "Depósitos",
+  "deposit.desc": "Crea depósitos y comprueba su estado.",
+  "deposit.create": "Crear depósito",
+  "deposit.amountUsd": "Cantidad ($USD)",
+  "deposit.currency": "Moneda",
+  "deposit.createAction": "Crear",
+  "deposit.creating": "Creando...",
+  "deposit.checkStatus": "Comprobar estado del depósito",
+  "deposit.depositId": "ID del depósito",
+  "deposit.enterDepositId": "Introduce el ID del depósito...",
+  "deposit.checkStatusAction": "Comprobar estado",
+  "deposit.invalidAmount": "Cantidad no válida",
+
+  "depositPage.created": "Depósito creado — envía exactamente la cantidad indicada",
+  "depositPage.paymentQr": "QR de pago",
+  "depositPage.address": "Dirección",
+  "depositPage.currency": "Moneda",
+  "depositPage.amount": "Cantidad",
+  "depositPage.depositId": "ID del depósito",
+  "depositPage.timeRemaining": "tiempo restante",
+  "depositPage.complete": "Depósito completado",
+  "depositPage.status": "Estado",
+  "depositPage.credited": "Acreditado",
+  "depositPage.done": "Hecho",
+  "depositPage.expired":
+    "El tiempo de pago ha expirado. Crea un nuevo depósito.",
+  "depositPage.tryAgain": "Intentar de nuevo",
+  "depositPage.close": "Cerrar",
+
+  "account.wallet": "Cartera",
+  "account.address": "Dirección",
+  "account.viewBalance": "Ver saldo",
+  "account.manageWallet": "Gestionar cartera",
+  "account.addFunds": "Añadir fondos",
+  "account.noWallet": "No hay ninguna cartera cargada.",
+  "account.seller": "Vendedor",
+  "account.streamsOne": "{count} flujo activo",
+  "account.streamsOther": "{count} flujos activos",
+  "account.sellerSettings": "Configuración del vendedor",
+  "account.system": "Sistema",
+  "account.dataDir": "Directorio de datos",
+  "account.walletPath": "Cartera",
+  "account.sessionPath": "Sesión",
+  "account.configPath": "Configuración",
+  "account.version": "Versión",
+  "account.logout": "Cerrar sesión",
+  "account.logoutWarning":
+    "Todas las sesiones activas se cerrarán y el vendedor se detendrá.",
+  "account.walletBalance": "Saldo de la cartera",
+  "account.failedBalance": "No se pudo cargar el saldo.",
+  "account.appInfo": "Información de la aplicación",
+  "account.spendable": "Disponible",
+  "account.buyerAvailable": "Disponible para comprador",
+  "account.buyerReserved": "Reservado para comprador",
+  "account.buyerSpent": "Gastado como comprador",
+  "account.sellerPending": "Pendiente de vendedor",
+  "account.sellerAvailable": "Disponible de vendedor",
+  "account.payoutLocked": "Pago bloqueado",
+
+  "faq.title": "FAQ",
+  "faq.desc": "Preguntas frecuentes sobre ProxyBase Markets.",
+  "faq.q1": "¿Qué es ProxyBase Markets?",
+  "faq.a1":
+    "ProxyBase Markets es un mercado descentralizado de ancho de banda entre pares. Los vendedores ofrecen sus conexiones a internet como salidas de proxy, y los compradores adquieren acceso a estos proxies para extracción web, navegación de agentes de IA y otro tráfico automatizado. Todos los pagos se liquidan en microcréditos respaldados por depósitos en criptomonedas.",
+  "faq.q2": "¿Cómo empiezo a vender mi ancho de banda?",
+  "faq.a2":
+    "Ve a la pestaña Vendedor, configura tus proxies ascendentes (opcional) y haz clic en 'Iniciar vendedor'. Tu nodo se registrará en el mercado y empezará a recibir pruebas QoS. Tras superar los controles de calidad, tu conexión se clasifica por país y tipo de red, y queda disponible para los compradores. Ganas créditos por cada GB de tráfico que retransmites.",
+  "faq.q3": "¿Cuáles son los tipos de red?",
+  "faq.a3":
+    "ProxyBase clasifica las conexiones de los vendedores en cinco tipos: Residencial (ISP doméstico), Móvil (operador de telefonía), Centro de datos (IPs de nube/colo), ISP (IPs empresariales/estáticas) y Quemable (IPs de VPN/tor/proxy). Las IPs quemables se marcan durante las pruebas QoS y pueden recibir precios más bajos o estar restringidas en ciertos grupos de compradores.",
+  "faq.q4": "¿Cómo compro una sesión de proxy?",
+  "faq.a4":
+    "Ve a la pestaña Mercado → Precios. Busca un país y un tipo de red con vendedores disponibles y haz clic en el botón verde 'Comprar' de esa fila. Se crea una sesión de proxy SOCKS5 que aparece en la pestaña 'Sesiones activas'. Tu saldo se debita por GB de tráfico utilizado. Cierra una sesión en cualquier momento con el botón X de su fila.",
+  "faq.q5": "¿Cómo funcionan los microcréditos y los precios?",
+  "faq.a5":
+    "1.000.000 de microcréditos = 1,00 USD. El precio se fija por país y tipo de red (p. ej., 0,50 USD/GB para residencial de EE. UU.). Los vendedores ganan créditos cuando los compradores usan sus proxies. Puedes depositar fondos con criptomonedas (BTC, USDC, USDT, SOL, etc.) a través de NOWPayments.",
+  "faq.q6": "¿Qué es un depósito y cómo creo uno?",
+  "faq.a6":
+    "Abre la página Cuenta desde el icono de la cabecera y pulsa 'Añadir fondos'. Elige una cantidad (10, 20, 100 USD o personalizada) y una criptomoneda. Tras crearlo, irás a una página de depósito con la dirección de pago, el código QR y una cuenta atrás de 9 minutos. Envía exactamente la cantidad indicada a esa dirección: tu saldo se actualiza automáticamente al confirmarse.",
+  "faq.q7": "¿Cómo compruebo el saldo de mi cartera?",
+  "faq.a7":
+    "Ve a la página Cuenta y pulsa 'Ver saldo'. Se muestran tus saldos, incluidos el disponible, lo reservado/gastado como comprador y las ganancias pendientes/disponibles/bloqueadas como vendedor.",
+  "faq.q8": "¿Qué ocurre cuando cierro la aplicación?",
+  "faq.a8":
+    "La aplicación sigue ejecutándose en la bandeja del sistema. Cerrar la ventana la oculta, no la cierra. Haz clic en el icono de la bandeja para mostrarla u ocultarla. Si estabas vendiendo ancho de banda, tu sesión de vendedor persiste y se reinicia automáticamente al iniciar. La aplicación también se registra para iniciarse con el sistema.",
+  "faq.q9": "¿Cómo creo una cartera?",
+  "faq.a9":
+    "La pantalla de bienvenida te guía en la creación de la cartera en el primer inicio. Para gestionarla más tarde, ve a la página Cuenta → 'Gestionar cartera'. Usa la pestaña 'Crear' para generar una frase mnemotécnica BIP-39 nueva (12 palabras), o 'Importar' para restaurar desde una frase existente. Guarda las palabras de forma segura: son la única forma de recuperar tu cartera. Tus datos se almacenan en ~/.proxybase/.",
+  "faq.q10": "¿La aplicación inicia sesión automáticamente?",
+  "faq.a10":
+    "Sí. Al iniciar, la pantalla de bienvenida detecta tu cartera existente y te registra automáticamente si no has establecido contraseña. Si configuraste una contraseña de cartera, tendrás que introducirla en la página de inicio de sesión.",
+  "faq.q11": "¿Qué datos se almacenan en mi equipo?",
+  "faq.a11":
+    "Todo se guarda en ~/.proxybase/: tu archivo de claves cifrado de la cartera (wallet/keyfile.enc), el token de sesión (session_token) y la configuración (config.toml). Las claves privadas nunca se envían al backend: la autenticación usa firmas criptográficas de tu cartera local.",
+  "faq.q12":
+    "¿Qué son las pruebas QoS y cómo afectan a mi estado de vendedor?",
+  "faq.a12":
+    "Las pruebas de calidad de servicio son tests automatizados que ejecuta el mercado para verificar la velocidad, latencia y fiabilidad de tu conexión. Las pruebas se conectan a través de tu relay, miden latencia y disponibilidad, y clasifican tu IP (país, ISP, tipo de red). Los vendedores que fallan las pruebas quedan suspendidos. Un buen rendimiento constante lleva a pasar del grupo de Prueba al de Producción.",
+  "faq.q13": "¿Cuáles son los niveles del grupo de vendedores?",
+  "faq.a13":
+    "Prueba: vendedores nuevos en evaluación QoS. Producción: vendedores verificados con fiabilidad demostrada — tienen prioridad para las sesiones de compradores. Suspendido: vendedores que fallaron las pruebas o se desconectaron — se reevalúan automáticamente tras un periodo de retención.",
+  "faq.q14":
+    "¿Cómo uso el proxy SOCKS5 después de comprar una sesión?",
+  "faq.a14":
+    "Haz clic en una fila de sesión en la pestaña Sesiones activas para ver los detalles de conexión. Configura tu aplicación para usar un proxy SOCKS5 en {proxyAddress} con el ID de sesión como usuario y tu token de sesión como contraseña. Ejemplo: curl.exe --socks5 {proxyAddress} --proxy-user ID_SESION:TOKEN https://example.com (usa curl en macOS/Linux)",
+  "faq.q15": "¿Qué ocurre con mis sesiones cuando cierro sesión?",
+  "faq.a15":
+    "Cerrar sesión desde la página Cuenta cierra todas las sesiones de proxy de comprador activas y detiene la conexión de vendedor si está en ejecución. Tu token de sesión se elimina del disco.",
+  "faq.q16":
+    "¿Cómo me conecto a través de un proxy ascendente para la reventa?",
+  "faq.a16":
+    "En la pestaña Vendedor, añade proxies ascendentes en la sección 'Proxies ascendentes'. Cada entrada tiene un host:puerto, usuario y contraseña. El vendedor retransmite el tráfico a través de estos proxies ascendentes en lugar de (o además de) tu propia conexión. Usa la casilla 'Incluir conexión directa' para vender también tu propio ancho de banda. El backend distribuye los flujos entre todas las rutas mediante un hash round-robin.",
+  "faq.q17": "¿Para qué sirve el Discord?",
+  "faq.a17":
+    "El icono de Discord de la cabecera enlaza al servidor de la comunidad ProxyBase (discord.gg/7uedk7ajHD). Únete para soporte, anuncios y debates con otros vendedores y compradores.",
+  "faq.q18":
+    "¿Dónde puedo ver mi estado de vendedor e información del sistema?",
+  "faq.a18":
+    "Todo está en la página Cuenta: pulsa el icono de persona en la esquina superior derecha. Encontrarás tu estado de conexión, dirección y saldo de cartera, estado del vendedor con número de flujos activos, rutas de archivos del sistema y la versión de la aplicación.",
+
+  "layout.createDeposit": "Crear depósito",
+  "layout.amount": "Cantidad",
+  "layout.other": "Otro",
+  "layout.enterAmount": "Introduce una cantidad...",
+  "layout.currency": "Moneda",
+  "layout.creating": "Creando...",
+  "layout.createDepositAction": "Crear depósito",
+  "layout.cancel": "Cancelar",
+  "layout.enterValidAmount": "Introduce una cantidad válida",
+  "layout.amountTooSmall":
+    "La cantidad es demasiado pequeña. El mínimo lo fija el proveedor de pagos. Prueba con una cantidad mayor.",
+
+  "update.ready": "Actualización v{version} lista. Reinicia para aplicarla.",
+  "update.downloading": "Descargando actualización ({percent}%)...",
+  "update.available": "v{version} disponible",
+  "update.restartFailed":
+    "El reinicio falló — haz clic en Reiniciar de nuevo o relanza manualmente.",
+  "update.restart": "Reiniciar",
+  "update.update": "Actualizar",
+
+  "password.show": "MOSTRAR",
+  "password.hide": "OCULTAR",
+
+  "settings.title": "Ajustes",
+  "settings.desc": "Preferencias de la aplicación e idioma.",
+  "settings.language": "Idioma",
+  "settings.languageDesc":
+    "Elige el idioma usado en toda la aplicación. Por defecto sigue el idioma del sistema.",
+  "settings.followSystem": "Seguir el idioma del sistema",
+  "settings.systemLangLabel": "Sistema ({lang})",
+};
+
+export default es;

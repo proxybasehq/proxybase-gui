@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useI18n } from "../i18n";
 
 interface BottomNavProps {
   authenticated: boolean;
@@ -6,19 +7,20 @@ interface BottomNavProps {
 }
 
 export default function BottomNav({ authenticated, walletLoaded }: BottomNavProps) {
+  const { t } = useI18n();
   const tabs: Array<{ to: string; label: string; icon: React.FC }> = [];
 
   // Login only available when wallet exists but not authenticated
   if (!authenticated && walletLoaded) {
-    tabs.push({ to: "/login", label: "Login", icon: KeyIcon });
+    tabs.push({ to: "/login", label: t("nav.login"), icon: KeyIcon });
   }
 
   // Gated tabs — only visible when authenticated
   if (authenticated) {
     tabs.push(
-      { to: "/market", label: "Market", icon: GlobeIcon },
-      { to: "/seller", label: "Seller", icon: RadioIcon },
-      { to: "/faq", label: "FAQ", icon: FaqIcon },
+      { to: "/market", label: t("nav.market"), icon: GlobeIcon },
+      { to: "/seller", label: t("nav.seller"), icon: RadioIcon },
+      { to: "/faq", label: t("nav.faq"), icon: FaqIcon },
     );
   }
 

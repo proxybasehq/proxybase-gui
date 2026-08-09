@@ -1,0 +1,325 @@
+const en = {
+  // Common
+  "common.loading": "Loading...",
+  "common.back": "Back",
+  "common.close": "Close",
+  "common.cancel": "Cancel",
+  "common.refresh": "Refresh",
+  "common.create": "Create",
+  "common.creating": "Creating...",
+  "common.copied": "Copied!",
+  "common.address": "Address",
+  "common.currency": "Currency",
+  "common.username": "Username",
+  "common.password": "Password",
+  "common.status": "Status",
+  "common.country": "Country",
+  "common.type": "Type",
+  "common.amount": "Amount",
+  "common.login": "Login",
+  "common.running": "Running",
+  "common.reconnecting": "Reconnecting...",
+  "common.stopped": "Stopped",
+  "common.support": "Support",
+  "common.direct": "Direct",
+  "common.other": "Other",
+  "common.continue": "Continue",
+
+  // Navigation / header
+  "nav.market": "Market",
+  "nav.seller": "Seller",
+  "nav.faq": "FAQ",
+  "nav.login": "Login",
+  "nav.settings": "Settings",
+  "nav.account": "Account",
+  "nav.discord": "Discord",
+
+  // Status bar
+  "status.authenticated": "Authenticated",
+  "status.notAuthenticated": "Not authenticated",
+
+  // Welcome / wallet onboarding
+  "welcome.title": "Welcome to ProxyBase",
+  "welcome.subtitle":
+    "A decentralized peer-to-peer bandwidth marketplace. Buy and sell proxy access using cryptocurrency deposits.",
+  "welcome.createWallet": "Create New Wallet",
+  "welcome.importWallet": "Import Existing Wallet",
+  "welcome.createTitle": "Create Wallet",
+  "welcome.createDesc": "Generate a new BIP-39 wallet. Save your mnemonic securely.",
+  "welcome.encryptionPassword": "Encryption Password (optional)",
+  "welcome.passwordPlaceholder": "Leave empty for no password",
+  "welcome.walletCreated": "Wallet Created",
+  "welcome.saveMnemonic": "Save Your Mnemonic",
+  "welcome.saveMnemonicDesc":
+    "Write these 12 words down in order. Anyone with this phrase can access your wallet. Never share it.",
+  "welcome.signingIn": "Signing in...",
+  "welcome.continue": "Continue",
+  "welcome.importTitle": "Import Wallet",
+  "welcome.importDesc": "Restore your wallet from a BIP-39 mnemonic phrase.",
+  "welcome.mnemonicPhrase": "12-word Mnemonic Phrase",
+  "welcome.mnemonicPlaceholder": "Enter the 12 words separated by spaces...",
+  "welcome.importing": "Importing...",
+  "welcome.importAndLogin": "Import & Login",
+  "welcome.autoLoginFailed": "Auto-login failed. Create or import a wallet.",
+  "welcome.enterMnemonic": "Enter your mnemonic phrase",
+
+  // Login
+  "login.title": "Login",
+  "login.desc": "Authenticate with your wallet to access the ProxyBase network.",
+  "login.noWallet": "No Wallet Found",
+  "login.noWalletDesc": "Create or import a wallet first from the Wallet page.",
+  "login.authenticate": "Authenticate",
+  "login.walletAddress": "Wallet Address",
+  "login.walletPassword": "Wallet Password",
+  "login.passwordPlaceholder":
+    "Enter wallet encryption password (leave empty if none)",
+  "login.authenticating": "Authenticating...",
+  "login.successful": "Login Successful",
+  "login.role": "Role:",
+  "login.buyerAvailable": "Buyer Available:",
+  "login.spendableBalance": "Spendable Balance:",
+
+  // Wallet page
+  "wallet.title": "Wallet",
+  "wallet.desc": "Manage your ProxyBase wallet identity.",
+  "wallet.info": "Info",
+  "wallet.create": "Create",
+  "wallet.import": "Import",
+  "wallet.status": "Wallet Status",
+  "wallet.addressLabel": "Address:",
+  "wallet.loaded": "Loaded",
+  "wallet.noWallet": "No wallet found. Create or import one.",
+  "wallet.clickInfo": "Click Info to check wallet status.",
+  "wallet.createNew": "Create New Wallet",
+  "wallet.encryptionPassword": "Encryption Password (optional)",
+  "wallet.passwordPlaceholder": "Leave empty for no password",
+  "wallet.createWallet": "Create Wallet",
+  "wallet.creating": "Creating...",
+  "wallet.walletAddress": "Wallet Address",
+  "wallet.mnemonic": "Mnemonic — SAVE SECURELY",
+  "wallet.mnemonicWarning":
+    "Write these 12 words down in order. Anyone with this phrase can access your wallet.",
+  "wallet.importFromMnemonic": "Import from Mnemonic",
+  "wallet.mnemonicPhrase": "12-word Mnemonic Phrase",
+  "wallet.mnemonicPlaceholder": "Enter the 12 words separated by spaces...",
+  "wallet.importing": "Importing...",
+  "wallet.importWallet": "Import Wallet",
+  "wallet.imported": "Imported",
+
+  // Market
+  "market.title": "Market",
+  "market.desc": "Browse countries, pricing, and manage proxy sessions.",
+  "market.prices": "Prices",
+  "market.activeSessions": "Active Sessions",
+  "market.insufficientBalance": "Insufficient Balance",
+  "market.insufficientDesc":
+    "You don't have enough funds. Deposit crypto to continue.",
+  "market.depositFunds": "Deposit Funds",
+  "market.dismiss": "Dismiss",
+  "market.connectionDetails": "Proxy Connection Details",
+  "market.remote": "Remote",
+  "market.localBridge": "Local Bridge",
+  "market.proxyAddress": "Proxy Address",
+  "market.sessionId": "Session ID",
+  "market.password": "Password",
+  "market.country": "Country",
+  "market.type": "Type",
+  "market.exampleCurl": "Example (curl)",
+  "market.localBridgeDesc":
+    "Use the local bridge for apps like Chrome that don't support authenticated proxies.",
+  "market.auth": "Auth",
+  "market.noneRequired": "None required",
+  "market.exampleCurlLocal": "Example (curl • local)",
+  "market.bridgeNotRunning":
+    "Bridge not running. The session may have been bought from another device.",
+  "market.pricing": "Pricing",
+  "market.refresh": "Refresh",
+  "market.loadingPricing": "Loading pricing data...",
+  "market.category": "Category",
+  "market.price": "Price",
+  "market.buying": "Buying...",
+  "market.buy": "Buy",
+  "market.noSellers": "No sellers available.",
+  "market.activeSessionsCount": "Active Sessions ({count})",
+  "market.noActiveSessions": "No active sessions. Buy one from the Prices tab.",
+  "market.mode": "Mode",
+  "market.closeSession": "Close session",
+
+  // Seller
+  "seller.title": "Seller",
+  "seller.desc": "Start selling your bandwidth on the ProxyBase marketplace.",
+  "seller.status": "Seller Status",
+  "seller.refreshStatus": "Refresh Status",
+  "seller.startStop": "Start / Stop Seller",
+  "seller.includeDirect": "Include direct (sell own bandwidth)",
+  "seller.upstreamProxies": "Upstream Proxies (resell)",
+  "seller.hostPort": "Host:Port",
+  "seller.username": "Username",
+  "seller.password": "Password",
+  "seller.remove": "Remove",
+  "seller.addUpstream": "+ Add Upstream Proxy",
+  "seller.startSeller": "Start Seller",
+  "seller.stopSeller": "Stop Seller",
+  "seller.activeStreams": "Active Streams ({count})",
+  "seller.noStreams": "No active streams. Waiting for connections...",
+  "seller.sessionId": "Session ID",
+  "seller.target": "Target",
+  "seller.route": "Route",
+  "seller.proxyN": "Proxy #{n}",
+
+  // Deposits (buyer)
+  "deposit.title": "Deposits",
+  "deposit.desc": "Create deposits and check their status.",
+  "deposit.create": "Create Deposit",
+  "deposit.amountUsd": "Amount ($USD)",
+  "deposit.currency": "Currency",
+  "deposit.createAction": "Create",
+  "deposit.creating": "Creating...",
+  "deposit.checkStatus": "Check Deposit Status",
+  "deposit.depositId": "Deposit ID",
+  "deposit.enterDepositId": "Enter deposit ID...",
+  "deposit.checkStatusAction": "Check Status",
+  "deposit.invalidAmount": "Invalid amount",
+
+  // Deposit page
+  "depositPage.created": "Deposit created — send the exact amount shown",
+  "depositPage.paymentQr": "Payment QR",
+  "depositPage.address": "Address",
+  "depositPage.currency": "Currency",
+  "depositPage.amount": "Amount",
+  "depositPage.depositId": "Deposit ID",
+  "depositPage.timeRemaining": "time remaining",
+  "depositPage.complete": "Deposit Complete",
+  "depositPage.status": "Status",
+  "depositPage.credited": "Credited",
+  "depositPage.done": "Done",
+  "depositPage.expired": "Payment time expired. Please create a new deposit.",
+  "depositPage.tryAgain": "Try Again",
+  "depositPage.close": "Close",
+
+  // Account
+  "account.wallet": "Wallet",
+  "account.address": "Address",
+  "account.viewBalance": "View Balance",
+  "account.manageWallet": "Manage Wallet",
+  "account.addFunds": "Add Funds",
+  "account.noWallet": "No wallet loaded.",
+  "account.seller": "Seller",
+  "account.streamsOne": "{count} active stream",
+  "account.streamsOther": "{count} active streams",
+  "account.sellerSettings": "Seller Settings",
+  "account.system": "System",
+  "account.dataDir": "Data dir",
+  "account.walletPath": "Wallet",
+  "account.sessionPath": "Session",
+  "account.configPath": "Config",
+  "account.version": "Version",
+  "account.logout": "Logout",
+  "account.logoutWarning":
+    "All active sessions will be closed and the seller will be stopped.",
+  "account.walletBalance": "Wallet Balance",
+  "account.failedBalance": "Failed to load balance.",
+  "account.appInfo": "App Info",
+  "account.spendable": "Spendable",
+  "account.buyerAvailable": "Buyer Available",
+  "account.buyerReserved": "Buyer Reserved",
+  "account.buyerSpent": "Buyer Spent",
+  "account.sellerPending": "Seller Pending",
+  "account.sellerAvailable": "Seller Available",
+  "account.payoutLocked": "Payout Locked",
+
+  // FAQ
+  "faq.title": "FAQ",
+  "faq.desc": "Frequently asked questions about ProxyBase Markets.",
+  "faq.q1": "What is ProxyBase Markets?",
+  "faq.a1":
+    "ProxyBase Markets is a decentralized peer-to-peer bandwidth marketplace. Sellers offer their internet connections as proxy exits, and buyers purchase access to these proxies for web scraping, AI agent browsing, and other automated traffic. All payments are settled in microcredits backed by cryptocurrency deposits.",
+  "faq.q2": "How do I start selling my bandwidth?",
+  "faq.a2":
+    "Go to the Seller tab, configure your upstream proxies (optional), and click 'Start Seller'. Your node will register with the marketplace and begin receiving QoS probes. After passing quality checks, your connection is classified by country and network type, and becomes available for buyers to purchase. You earn credits for every GB of traffic you relay.",
+  "faq.q3": "What are the network types?",
+  "faq.a3":
+    "ProxyBase classifies seller connections into five types: Residential (home ISP), Mobile (cellular carrier), Datacenter (cloud/colo IPs), ISP (business/static IPs), and Burner (VPN/tor/proxy IPs). Burner IPs are flagged during QoS probing and may receive lower pricing or be restricted from certain buyer pools.",
+  "faq.q4": "How do I buy a proxy session?",
+  "faq.a4":
+    "Go to the Market tab → Prices. Find a country and network type with available sellers, then click the green 'Buy' button on that row. A SOCKS5 proxy session is created and appears under the 'Active Sessions' tab. Your wallet balance is debited per GB of traffic used. Close a session anytime by clicking the X button on its row.",
+  "faq.q5": "How do microcredits and pricing work?",
+  "faq.a5":
+    "1,000,000 microcredits = $1.00 USD. Pricing is set per country and network type (e.g. $0.50/GB for US residential). Sellers earn credits when buyers use their proxies. You can deposit funds using cryptocurrencies (BTC, USDC, USDT, SOL, etc.) via NOWPayments.",
+  "faq.q6": "What is a deposit and how do I create one?",
+  "faq.a6":
+    "Open the Account page from the header icon, then tap 'Add Funds'. Choose an amount ($10, $20, $100, or custom) and a cryptocurrency. After creation you'll be taken to a deposit page showing the payment address, QR code, and a 9-minute countdown. Send exactly the shown amount to that address — your wallet balance updates automatically once confirmed.",
+  "faq.q7": "How do I check my wallet balance?",
+  "faq.a7":
+    "Go to the Account page and tap 'View Balance'. Your balances are displayed, including spendable balance, buyer available/reserved/spent, and seller pending/available/payout-locked earnings.",
+  "faq.q8": "What happens when I close the app?",
+  "faq.a8":
+    "The app continues running in the system tray. Closing the window hides it — it doesn't quit. Click the tray icon to show or hide. If you were selling bandwidth, your seller session persists and auto-restarts on next launch. The app also registers for autostart so it launches on system boot.",
+  "faq.q9": "How do I create a wallet?",
+  "faq.a9":
+    "The welcome screen guides you through wallet creation on first launch. To manage your wallet later, go to the Account page → 'Manage Wallet'. Use the 'Create' tab to generate a new BIP-39 mnemonic (12 words), or 'Import' to restore from an existing phrase. Save the words securely — they are the only way to recover your wallet. Your wallet data is stored under ~/.proxybase/.",
+  "faq.q10": "Does the app auto-login?",
+  "faq.a10":
+    "Yes. On launch the welcome screen detects your existing wallet and signs you in automatically if no password is set. If you set a wallet password, you'll need to enter it on the Login page.",
+  "faq.q11": "What data is stored on my machine?",
+  "faq.a11":
+    "Everything is stored under ~/.proxybase/: your encrypted wallet keyfile (wallet/keyfile.enc), session token (session_token), and configuration (config.toml). No private keys are ever sent to the backend — authentication uses cryptographic signatures from your local wallet.",
+  "faq.q12": "What are QoS probes and how do they affect my seller status?",
+  "faq.a12":
+    "Quality of Service probes are automated tests run by the marketplace to verify your connection's speed, latency, and reliability. Probes connect through your relay, measure latency and uptime, and classify your IP (country, ISP, network type). Sellers that fail probes are suspended. Consistent good performance leads to promotion from the Trial pool to Production.",
+  "faq.q13": "What are the seller pool tiers?",
+  "faq.a13":
+    "Trial: New sellers undergoing QoS evaluation. Production: Verified sellers with proven reliability — these are prioritized for buyer sessions. Suspended: Sellers that failed probes or went offline — automatically re-evaluated after a holdback period.",
+  "faq.q14": "How do I use the SOCKS5 proxy after buying a session?",
+  "faq.a14":
+    "Click a session row in the Active Sessions tab to see connection details. Configure your application to use a SOCKS5 proxy at {proxyAddress} with the session ID as username and your session token as password. Example: curl.exe --socks5 {proxyAddress} --proxy-user SESSION_ID:TOKEN https://example.com (use curl on macOS/Linux)",
+  "faq.q15": "What happens to my sessions when I log out?",
+  "faq.a15":
+    "Logging out from the Account page closes all active buyer proxy sessions and stops the seller connection if running. Your session token is deleted from disk.",
+  "faq.q16": "How do I connect through an upstream proxy for reselling?",
+  "faq.a16":
+    "In the Seller tab, add upstream proxies in the 'Upstream Proxies' section. Each entry has a host:port, username, and password. The seller relays traffic through these upstream proxies instead of (or in addition to) your own connection. Use the 'Include direct' checkbox to also sell your own bandwidth. The backend distributes streams across all paths using a round-robin hash.",
+  "faq.q17": "What is the Discord for?",
+  "faq.a17":
+    "The Discord icon in the header links to the ProxyBase community server (discord.gg/7uedk7ajHD). Join for support, announcements, and discussions with other sellers and buyers.",
+  "faq.q18": "Where can I see my seller status and system info?",
+  "faq.a18":
+    "Everything is on the Account page — tap the person icon in the top-right header. You'll find your connection status, wallet address and balance, seller state with active stream count, system file paths, and the app version.",
+
+  // Layout / deposit modal
+  "layout.createDeposit": "Create Deposit",
+  "layout.amount": "Amount",
+  "layout.other": "Other",
+  "layout.enterAmount": "Enter amount...",
+  "layout.currency": "Currency",
+  "layout.creating": "Creating...",
+  "layout.createDepositAction": "Create Deposit",
+  "layout.cancel": "Cancel",
+  "layout.enterValidAmount": "Enter a valid amount",
+  "layout.amountTooSmall":
+    "Amount is too small. The minimum is set by the payment provider. Try a larger amount.",
+
+  // Update banner
+  "update.ready": "Update v{version} ready. Restart to apply.",
+  "update.downloading": "Downloading update ({percent}%)...",
+  "update.available": "v{version} available",
+  "update.restartFailed":
+    "Restart failed — click Restart again or relaunch manually.",
+  "update.restart": "Restart",
+  "update.update": "Update",
+
+  // Password input
+  "password.show": "SHOW",
+  "password.hide": "HIDE",
+
+  // Settings
+  "settings.title": "Settings",
+  "settings.desc": "App preferences and language.",
+  "settings.language": "Language",
+  "settings.languageDesc":
+    "Choose the language used throughout the app. By default it follows your system language.",
+  "settings.followSystem": "Follow system language",
+  "settings.systemLangLabel": "System ({lang})",
+};
+
+export default en;

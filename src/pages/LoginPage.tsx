@@ -7,8 +7,10 @@ import PasswordInput from "../components/PasswordInput";
 import JsonView from "../components/JsonView";
 import type { LoginResult } from "../api";
 import { formatUsd } from "../utils";
+import { useI18n } from "../i18n";
 
 export default function LoginPage() {
+  const { t } = useI18n();
   const { backendUrl } = useBackend();
   const { onLoginSuccess } = useOutletContext<AppContext>();
   const [password, setPassword] = useState("");
@@ -41,43 +43,43 @@ export default function LoginPage() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Login</h1>
-        <p className="page-description">Authenticate with your wallet to access the ProxyBase network.</p>
+        <h1 className="page-title">{t("login.title")}</h1>
+        <p className="page-description">{t("login.desc")}</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
       {!walletLoaded ? (
         <div className="card">
-          <div className="card-title">No Wallet Found</div>
-          <p className="text-muted">Create or import a wallet first from the Wallet page.</p>
+          <div className="card-title">{t("login.noWallet")}</div>
+          <p className="text-muted">{t("login.noWalletDesc")}</p>
         </div>
       ) : (
         <div className="card">
-          <div className="card-title">Authenticate</div>
+          <div className="card-title">{t("login.authenticate")}</div>
           <div className="form-group">
-            <label className="form-label">Wallet Address</label>
+            <label className="form-label">{t("login.walletAddress")}</label>
             <code className="font-mono word-break" style={{ fontSize: 13 }}>{walletAddr}</code>
           </div>
           <PasswordInput
-            label="Wallet Password"
+            label={t("login.walletPassword")}
             value={password}
             onChange={setPassword}
-            placeholder="Enter wallet encryption password (leave empty if none)"
+            placeholder={t("login.passwordPlaceholder")}
           />
           <button className="btn btn-primary" onClick={handleLogin} disabled={loading}>
-            {loading ? "Authenticating..." : "Login"}
+            {loading ? t("login.authenticating") : t("login.title")}
           </button>
         </div>
       )}
 
       {result && (
         <div className="card mt-lg">
-          <div className="card-title">Login Successful</div>
+          <div className="card-title">{t("login.successful")}</div>
           <div className="flex flex-col gap-sm mb-md">
-            <div><span className="text-muted">Role:</span> <span className="badge badge-success">{result.role}</span></div>
-            <div><span className="text-muted">Buyer Available:</span> {formatUsd(result.buyer_available)}</div>
-            <div><span className="text-muted">Spendable Balance:</span> {formatUsd(result.spendable_balance)}</div>
+            <div><span className="text-muted">{t("login.role")}</span> <span className="badge badge-success">{result.role}</span></div>
+            <div><span className="text-muted">{t("login.buyerAvailable")}</span> {formatUsd(result.buyer_available)}</div>
+            <div><span className="text-muted">{t("login.spendableBalance")}</span> {formatUsd(result.spendable_balance)}</div>
           </div>
           <JsonView data={result} />
         </div>

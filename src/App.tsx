@@ -8,6 +8,7 @@ import SellerPage from "./pages/SellerPage";
 import FaqPage from "./pages/FaqPage";
 import AccountPage from "./pages/AccountPage";
 import DepositPage from "./pages/DepositPage";
+import SettingsPage from "./pages/SettingsPage";
 import "./App.css";
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/deposit" element={<DepositPage />} />
           <Route path="/faq" element={<FaqPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </HashRouter>

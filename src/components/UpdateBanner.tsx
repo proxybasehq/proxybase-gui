@@ -1,6 +1,8 @@
 import { useUpdater } from "../hooks/useUpdater";
+import { useI18n } from "../i18n";
 
 export default function UpdateBanner() {
+  const { t } = useI18n();
   const {
     update,
     downloading,
@@ -29,14 +31,14 @@ export default function UpdateBanner() {
     >
       <span>
         {readyToRestart
-          ? `Update v${update?.version} ready. Restart to apply.`
+          ? t("update.ready", { version: update?.version ?? "" })
           : downloading
-          ? `Downloading update${progress ? ` (${progress.percentage}%)` : ""}...`
-          : `v${update?.version} available`}
+          ? t("update.downloading", { percent: progress ? progress.percentage : "" })
+          : t("update.available", { version: update?.version ?? "" })}
       </span>
       {error && (
         <span style={{ fontSize: 11, opacity: 0.9 }} title={error}>
-          Restart failed — click Restart again or relaunch manually.
+          {t("update.restartFailed")}
         </span>
       )}
       <span>
@@ -54,7 +56,7 @@ export default function UpdateBanner() {
             }}
             onClick={() => { restartApp(); }}
           >
-            Restart
+            {t("update.restart")}
           </button>
         ) : downloading ? null : (
           <button
@@ -70,7 +72,7 @@ export default function UpdateBanner() {
             }}
             onClick={downloadAndInstall}
           >
-            Update
+            {t("update.update")}
           </button>
         )}
       </span>

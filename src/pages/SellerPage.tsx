@@ -5,8 +5,10 @@ import type { UpstreamProxy } from "../api";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
 import JsonView from "../components/JsonView";
+import { useI18n } from "../i18n";
 
 export default function SellerPage() {
+  const { t } = useI18n();
   const { backendUrl } = useBackend();
   const { isAuthenticated, seller, startSeller, stopSeller } = useOutletContext<AppContext>();
 
@@ -67,18 +69,18 @@ export default function SellerPage() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Seller</h1>
-        <p className="page-description">Start selling your bandwidth on the ProxyBase marketplace.</p>
+        <h1 className="page-title">{t("seller.title")}</h1>
+        <p className="page-description">{t("seller.desc")}</p>
       </div>
 
       {/* Status card — reads from persistent background state */}
       <div className="card">
         <div className="flex justify-between items-center">
-          <div className="card-title" style={{ marginBottom: 0 }}>Seller Status</div>
+          <div className="card-title" style={{ marginBottom: 0 }}>{t("seller.status")}</div>
           <div className="flex gap-sm items-center">
             <span className={seller.connected ? "status-dot status-dot-connected" : "status-dot status-dot-disconnected"} />
             <span style={{ fontSize: 13, fontFamily: "var(--font-mono)" }}>
-              {seller.connected ? "Running" : seller.running ? "Reconnecting..." : "Stopped"}
+              {seller.connected ? t("common.running") : seller.running ? t("common.reconnecting") : t("common.stopped")}
             </span>
           </div>
         </div>
@@ -87,7 +89,7 @@ export default function SellerPage() {
         {startError && <div className="alert alert-error mt-md">{startError}</div>}
         <div className="flex gap-sm mt-md">
           <button className="btn btn-secondary btn-sm" onClick={handleStatus} disabled={statusLoading}>
-            {statusLoading ? "Loading..." : "Refresh Status"}
+            {statusLoading ? t("common.loading") : t("seller.refreshStatus")}
           </button>
         </div>
         {status && <div className="mt-md"><JsonView data={status} /></div>}
@@ -95,7 +97,7 @@ export default function SellerPage() {
 
       {/* Controls */}
       <div className="card">
-        <div className="card-title">Start / Stop Seller</div>
+        <div className="card-title">{t("seller.startStop")}</div>
 
         <div className="form-group">
           <label className="form-label">
@@ -105,41 +107,41 @@ export default function SellerPage() {
               onChange={(e) => setIncludeDirect(e.target.checked)}
               style={{ marginRight: 8 }}
             />
-            Include direct (sell own bandwidth)
+            {t("seller.includeDirect")}
           </label>
         </div>
 
-        <div className="form-label">Upstream Proxies (resell)</div>
+        <div className="form-label">{t("seller.upstreamProxies")}</div>
         {upstreams.map((u, i) => (
           <div key={i} className="form-row mb-md" style={{ padding: "var(--space-sm)", border: "1px solid var(--color-hairline)", borderRadius: "var(--rounded-sm)" }}>
             <div className="form-group">
-              <label className="form-label">Host:Port</label>
+              <label className="form-label">{t("seller.hostPort")}</label>
               <input className="form-input" value={u.address} onChange={(e) => updateUpstream(i, "address", e.target.value)} placeholder="proxy.example:1080" />
             </div>
             <div className="form-group">
-              <label className="form-label">Username</label>
+              <label className="form-label">{t("seller.username")}</label>
               <input className="form-input" value={u.username} onChange={(e) => updateUpstream(i, "username", e.target.value)} placeholder="user" />
             </div>
             <div className="form-group">
-              <label className="form-label">Password</label>
+              <label className="form-label">{t("seller.password")}</label>
               <input className="form-input" value={u.password} onChange={(e) => updateUpstream(i, "password", e.target.value)} placeholder="pass" />
             </div>
             <div className="form-group form-group-btn">
               <label className="form-label">&nbsp;</label>
-              <button className="btn btn-danger btn-sm" onClick={() => removeUpstream(i)}>Remove</button>
+              <button className="btn btn-danger btn-sm" onClick={() => removeUpstream(i)}>{t("seller.remove")}</button>
             </div>
           </div>
         ))}
-        <button className="btn btn-secondary btn-sm mb-md" onClick={addUpstream}>+ Add Upstream Proxy</button>
+        <button className="btn btn-secondary btn-sm mb-md" onClick={addUpstream}>{t("seller.addUpstream")}</button>
 
         <div className="flex gap-sm">
           {!seller.running ? (
             <button className="btn btn-primary" onClick={handleStart}>
-              Start Seller
+              {t("seller.startSeller")}
             </button>
           ) : (
             <button className="btn btn-danger" onClick={handleStop}>
-              Stop Seller
+              {t("seller.stopSeller")}
             </button>
           )}
         </div>
@@ -148,16 +150,16 @@ export default function SellerPage() {
       {/* Stream Monitor — reads from persistent background state */}
       {seller.running && (
         <div className="card">
-          <div className="card-title">Active Streams ({seller.streams.length})</div>
+          <div className="card-title">{t("seller.activeStreams", { count: seller.streams.length })}</div>
           {seller.streams.length === 0 ? (
-            <p className="text-muted">No active streams. Waiting for connections...</p>
+            <p className="text-muted">{t("seller.noStreams")}</p>
           ) : (
             <table>
               <thead>
                 <tr>
-                  <th>Session ID</th>
-                  <th>Target</th>
-                  <th>Route</th>
+                  <th>{t("seller.sessionId")}</th>
+                  <th>{t("seller.target")}</th>
+                  <th>{t("seller.route")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -166,7 +168,7 @@ export default function SellerPage() {
                     <td className="font-mono" style={{ fontSize: 12 }}>{s.session_id.slice(0, 16)}...</td>
                     <td className="font-mono">{s.target_ip}:{s.target_port}</td>
                     <td>
-                      <span className="badge">{s.route_index !== null ? `Proxy #${s.route_index}` : "Direct"}</span>
+                      <span className="badge">{s.route_index !== null ? t("seller.proxyN", { n: s.route_index }) : t("common.direct")}</span>
                     </td>
                   </tr>
                 ))}

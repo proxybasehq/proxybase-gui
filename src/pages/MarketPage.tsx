@@ -7,8 +7,10 @@ import { useBackend } from "../hooks/useBackend";
 import { formatUsdPerGb, PROXY_ADDRESS } from "../utils";
 import { CountryFlag } from "../components/CountryFlag";
 import { track, TrackEvent } from "../tracking";
+import { useI18n } from "../i18n";
 
 export default function MarketPage() {
+  const { t } = useI18n();
   const { backendUrl } = useBackend();
   const { isAuthenticated, openDeposit } = useOutletContext<AppContext>();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -40,7 +42,7 @@ export default function MarketPage() {
         <td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>{label}</td>
         <td className="font-mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
           {display}
-          {copied === label && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 10 }}>Copied!</span>}
+          {copied === label && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 10 }}>{t("common.copied")}</span>}
         </td>
       </tr>
     );
@@ -344,17 +346,17 @@ export default function MarketPage() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Market</h1>
-        <p className="page-description">Browse countries, pricing, and manage proxy sessions.</p>
+        <h1 className="page-title">{t("market.title")}</h1>
+        <p className="page-description">{t("market.desc")}</p>
       </div>
 
       <div className="tabs">
         <button className={`tab ${activeTab === "prices" ? "active" : ""}`} onClick={() => setActiveTab("prices")}>
-          Prices
+          {t("market.prices")}
         </button>
         {sessions.length > 0 && (
           <button className={`tab ${activeTab === "sessions" ? "active" : ""}`} onClick={() => setActiveTab("sessions")}>
-            Active Sessions
+            {t("market.activeSessions")}
           </button>
         )}
       </div>
@@ -370,17 +372,17 @@ export default function MarketPage() {
         }}>
           <div style={{ fontSize: 28, marginBottom: "var(--space-xs)", lineHeight: 1 }}>{'⚠'}</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-ink)", marginBottom: 4 }}>
-            Insufficient Balance
+            {t("market.insufficientBalance")}
           </div>
           <p style={{ fontSize: 13, color: "var(--color-body)", margin: "0 0 var(--space-sm) 0", lineHeight: 1.5 }}>
-            You don't have enough funds. Deposit crypto to continue.
+            {t("market.insufficientDesc")}
           </p>
           <div style={{ display: "flex", gap: "var(--space-sm)", justifyContent: "center" }}>
             <button className="btn btn-success btn-sm" onClick={() => { setInsufficientFunds(false); openDeposit(); }}>
-              Deposit Funds
+              {t("market.depositFunds")}
             </button>
             <button className="btn btn-secondary btn-sm" onClick={() => setInsufficientFunds(false)}>
-              Dismiss
+              {t("market.dismiss")}
             </button>
           </div>
         </div>
@@ -391,14 +393,14 @@ export default function MarketPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => setConnectModal(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="card-title">Proxy Connection Details</div>
+            <div className="card-title">{t("market.connectionDetails")}</div>
 
             <div className="tabs" style={{ marginTop: "var(--space-sm)" }}>
               <button className={`tab ${connectTab === "remote" ? "active" : ""}`} onClick={() => setConnectTab("remote")}>
-                Remote
+                {t("market.remote")}
               </button>
               <button className={`tab ${connectTab === "local" ? "active" : ""}`} onClick={() => setConnectTab("local")}>
-                Local Bridge
+                {t("market.localBridge")}
               </button>
             </div>
 
@@ -406,52 +408,52 @@ export default function MarketPage() {
               <>
                 <table style={{ marginTop: "var(--space-sm)" }}>
                   <tbody>
-                    {copyTr({ label: "Proxy Address", value: PROXY_ADDRESS })}
-                    {copyTr({ label: "Username", value: (connectModal as any).session_id })}
-                    {copyTr({ label: "Session ID", value: (connectModal as any).session_id })}
-                    {copyTr({ label: "Password", value: token.slice(0, 20) + "...", full: token })}
-                    {copyTr({ label: "Country", value: (connectModal as any).country })}
-                    {copyTr({ label: "Type", value: (connectModal as any).network_type || (connectModal as any).proxy_category })}
+                    {copyTr({ label: t("market.proxyAddress"), value: PROXY_ADDRESS })}
+                    {copyTr({ label: t("common.username"), value: (connectModal as any).session_id })}
+                    {copyTr({ label: t("market.sessionId"), value: (connectModal as any).session_id })}
+                    {copyTr({ label: t("market.password"), value: token.slice(0, 20) + "...", full: token })}
+                    {copyTr({ label: t("market.country"), value: (connectModal as any).country })}
+                    {copyTr({ label: t("market.type"), value: (connectModal as any).network_type || (connectModal as any).proxy_category })}
                   </tbody>
                 </table>
-                <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl)</div>
+                <div className="form-label" style={{ marginTop: "var(--space-md)" }}>{t("market.exampleCurl")}</div>
                 <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
                   onClick={() => copyToClipboard(`${navigator.platform.includes("Win") ? "curl.exe" : "curl"} --socks5 ${PROXY_ADDRESS} --proxy-user ${(connectModal as any).session_id}:${token} http://api.proxybase.xyz/v2/ip`, "Example")}>
                   {navigator.platform.includes("Win") ? "curl.exe" : "curl"} --socks5 {PROXY_ADDRESS} \<br/>  --proxy-user {(connectModal as any).session_id}:{token} \<br/>  http://api.proxybase.xyz/v2/ip
-                  {copied === "Example" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
+                  {copied === "Example" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>{t("common.copied")}</span>}
                 </pre>
               </>
             )}
 
             {connectTab === "local" && (
-              <>
+                <>
                 <p style={{ fontSize: 12, color: "var(--color-body)", marginTop: "var(--space-sm)" }}>
-                  Use the local bridge for apps like Chrome that don't support authenticated proxies.
+                  {t("market.localBridgeDesc")}
                 </p>
                 <table style={{ marginTop: "var(--space-sm)" }}>
                   <tbody>
-                    {copyTr({ label: "Proxy Address", value: "127.0.0.1:" + (bridgePorts[(connectModal as any).session_id] || "?") })}
-                    {copyTr({ label: "Auth", value: "None required" })}
+                    {copyTr({ label: t("market.proxyAddress"), value: "127.0.0.1:" + (bridgePorts[(connectModal as any).session_id] || "?") })}
+                    {copyTr({ label: t("market.auth"), value: t("market.noneRequired") })}
                   </tbody>
                 </table>
                 {bridgePorts[(connectModal as any).session_id] ? (
                   <>
-                    <div className="form-label" style={{ marginTop: "var(--space-md)" }}>Example (curl • local)</div>
+                    <div className="form-label" style={{ marginTop: "var(--space-md)" }}>{t("market.exampleCurlLocal")}</div>
                     <pre className="json-view" style={{ fontSize: 11, cursor: "pointer" }}
                       onClick={() => copyToClipboard(`${navigator.platform.includes("Win") ? "curl.exe" : "curl"} --socks5 127.0.0.1:${bridgePorts[(connectModal as any).session_id]} http://api.proxybase.xyz/v2/ip`, "Example (local)")}>
                       {navigator.platform.includes("Win") ? "curl.exe" : "curl"} --socks5 127.0.0.1:{bridgePorts[(connectModal as any).session_id]} http://api.proxybase.xyz/v2/ip
-                      {copied === "Example (local)" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>Copied!</span>}
+                      {copied === "Example (local)" && <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 10 }}>{t("common.copied")}</span>}
                     </pre>
                   </>
                 ) : (
                   <p className="text-muted" style={{ fontSize: 11, marginTop: "var(--space-md)" }}>
-                    Bridge not running. The session may have been bought from another device.
+                    {t("market.bridgeNotRunning")}
                   </p>
                 )}
               </>
             )}
 
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-md)", width: "100%" }} onClick={() => setConnectModal(null)}>Close</button>
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-md)", width: "100%" }} onClick={() => setConnectModal(null)}>{t("common.close")}</button>
           </div>
         </div>
       )}
@@ -460,18 +462,18 @@ export default function MarketPage() {
       {activeTab === "prices" && (
         <div className="card">
           <div className="flex justify-between items-center">
-            <div className="card-title" style={{ marginBottom: 0 }}>Pricing</div>
-            <button className="btn btn-sm btn-secondary" onClick={fetchPrices} disabled={pricesLoading}>Refresh</button>
+            <div className="card-title" style={{ marginBottom: 0 }}>{t("market.pricing")}</div>
+            <button className="btn btn-sm btn-secondary" onClick={fetchPrices} disabled={pricesLoading}>{t("market.refresh")}</button>
           </div>
           {pricesLoading && allPricing.length === 0 ? (
             <div style={{ textAlign: "center", padding: "var(--space-xl) 0" }}>
               <div className="welcome-loader" />
-              <p className="text-muted" style={{ marginTop: "var(--space-md)", fontSize: 13 }}>Loading pricing data...</p>
+              <p className="text-muted" style={{ marginTop: "var(--space-md)", fontSize: 13 }}>{t("market.loadingPricing")}</p>
             </div>
           ) : availablePrices.length > 0 ? (
             <div className="table-container" style={{ marginTop: "var(--space-sm)" }}>
               <table>
-                <thead><tr><th>Country</th><th>Category</th><th>Price</th><th style={{ width: 80 }}></th></tr></thead>
+                <thead><tr><th>{t("market.country")}</th><th>{t("market.category")}</th><th>{t("market.price")}</th><th style={{ width: 80 }}></th></tr></thead>
                 <tbody>
                   {availablePrices.map((p, i) => {
                     const c = (p as any).country as string;
@@ -493,7 +495,7 @@ export default function MarketPage() {
                           onClick={() => handleBuyFromPrice(c, nt)}
                           disabled={loading}
                         >
-                          {loading ? "Buying..." : "Buy"}
+                          {loading ? t("market.buying") : t("market.buy")}
                         </button>
                       </td>
                     </tr>
@@ -502,7 +504,7 @@ export default function MarketPage() {
               </table>
             </div>
           ) : (
-            <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>No sellers available.</p>
+            <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{t("market.noSellers")}</p>
           )}
         </div>
       )}
@@ -511,20 +513,20 @@ export default function MarketPage() {
       {activeTab === "sessions" && (
         <div className="card">
           <div className="flex justify-between items-center">
-            <div className="card-title" style={{ marginBottom: 0 }}>Active Sessions ({sessions.length})</div>
-            <button className="btn btn-sm btn-secondary" onClick={() => fetchSessions()}>Refresh</button>
+            <div className="card-title" style={{ marginBottom: 0 }}>{t("market.activeSessionsCount", { count: sessions.length })}</div>
+            <button className="btn btn-sm btn-secondary" onClick={() => fetchSessions()}>{t("market.refresh")}</button>
           </div>
           {sessions.length === 0 ? (
-            <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>No active sessions. Buy one from the Prices tab.</p>
+            <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{t("market.noActiveSessions")}</p>
           ) : (
             <div className="table-container" style={{ marginTop: "var(--space-sm)" }}>
               <table>
                 <thead>
                   <tr>
-                    <th>Country</th>
-                    <th>Type</th>
-                    <th>Mode</th>
-                    <th>Status</th>
+                    <th>{t("market.country")}</th>
+                    <th>{t("market.type")}</th>
+                    <th>{t("market.mode")}</th>
+                    <th>{t("common.status")}</th>
                     <th className="table-action" style={{ width: 40 }}></th>
                   </tr>
                 </thead>
@@ -541,7 +543,7 @@ export default function MarketPage() {
                       <td className="table-action" onClick={(e) => e.stopPropagation()}>
                         <button className="btn btn-sm btn-danger" style={{ padding: "0 6px", height: 26, fontSize: 11 }}
                           onClick={() => handleClose((s as any).session_id)}
-                          disabled={closingId === (s as any).session_id} title="Close session">
+                          disabled={closingId === (s as any).session_id} title={t("market.closeSession")}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                           </svg>

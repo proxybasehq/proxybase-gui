@@ -5,8 +5,10 @@ import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
 import JsonView from "../components/JsonView";
 import { usdToMc } from "../utils";
+import { useI18n } from "../i18n";
 
 export default function BuyerPage() {
+  const { t } = useI18n();
   const { backendUrl } = useBackend();
   const { isAuthenticated } = useOutletContext<AppContext>();
 
@@ -40,7 +42,7 @@ export default function BuyerPage() {
     setDepLoading(true);
     try {
       const amount = parseFloat(depAmount);
-      if (isNaN(amount) || amount <= 0) { setDepError("Invalid amount"); setDepLoading(false); return; }
+      if (isNaN(amount) || amount <= 0) { setDepError(t("deposit.invalidAmount")); setDepLoading(false); return; }
       const r = await createDeposit(backendUrl, usdToMc(amount), depCurrency);
       setDepResult(r);
     } catch (e) {
@@ -62,17 +64,17 @@ export default function BuyerPage() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Deposits</h1>
-        <p className="page-description">Create deposits and check their status.</p>
+        <h1 className="page-title">{t("deposit.title")}</h1>
+        <p className="page-description">{t("deposit.desc")}</p>
       </div>
 
       {/* Create Deposit */}
       <div className="card">
-        <div className="card-title">Create Deposit</div>
+        <div className="card-title">{t("deposit.create")}</div>
         {depError && <div className="alert alert-error">{depError}</div>}
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label">Amount ($USD)</label>
+            <label className="form-label">{t("deposit.amountUsd")}</label>
             <input
               type="number"
               step="0.01"
@@ -84,7 +86,7 @@ export default function BuyerPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Currency</label>
+            <label className="form-label">{t("deposit.currency")}</label>
             <select
               className="form-select"
               value={depCurrency}
@@ -98,7 +100,7 @@ export default function BuyerPage() {
           <div className="form-group form-group-btn">
             <label className="form-label">&nbsp;</label>
             <button className="btn btn-primary" onClick={handleCreateDeposit} disabled={depLoading || !depAmount}>
-              {depLoading ? "Creating..." : "Create"}
+              {depLoading ? t("deposit.creating") : t("deposit.createAction")}
             </button>
           </div>
         </div>
@@ -107,22 +109,22 @@ export default function BuyerPage() {
 
       {/* Deposit Status */}
       <div className="card">
-        <div className="card-title">Check Deposit Status</div>
+        <div className="card-title">{t("deposit.checkStatus")}</div>
         {depStatusError && <div className="alert alert-error">{depStatusError}</div>}
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label">Deposit ID</label>
+            <label className="form-label">{t("deposit.depositId")}</label>
             <input
               className="form-input"
               value={depId}
               onChange={(e) => setDepId(e.target.value)}
-              placeholder="Enter deposit ID..."
+              placeholder={t("deposit.enterDepositId")}
             />
           </div>
           <div className="form-group form-group-btn">
             <label className="form-label">&nbsp;</label>
             <button className="btn btn-secondary" onClick={handleDepositStatus} disabled={!depId}>
-              Check Status
+              {t("deposit.checkStatusAction")}
             </button>
           </div>
         </div>

@@ -63,6 +63,7 @@ pub fn run() {
 
     let builder = builder
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::default().build());
 
     #[cfg(desktop)]

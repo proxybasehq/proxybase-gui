@@ -5,6 +5,7 @@ import { useBackend } from "../hooks/useBackend";
 import { getBalance } from "../api";
 import { formatUsd } from "../utils";
 import { invoke } from "@tauri-apps/api/core";
+import { useI18n } from "../i18n";
 
 interface AppInfo {
   version: string;
@@ -15,6 +16,7 @@ interface AppInfo {
 }
 
 export default function AccountPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [appInfo, setAppInfo] = useState<AppInfo>({
     version: "0.1.0", git_hash: "dev", build_date: "local",
@@ -48,10 +50,10 @@ export default function AccountPage() {
 
   function renderBalanceRows(data: Record<string, unknown>) {
     const mcFields: [string, string][] = [
-      ["spendable_balance", "Spendable"], ["buyer_available", "Buyer Available"],
-      ["buyer_reserved", "Buyer Reserved"], ["buyer_spent", "Buyer Spent"],
-      ["seller_pending", "Seller Pending"], ["seller_available", "Seller Available"],
-      ["seller_payout_locked", "Payout Locked"],
+      ["spendable_balance", t("account.spendable")], ["buyer_available", t("account.buyerAvailable")],
+      ["buyer_reserved", t("account.buyerReserved")], ["buyer_spent", t("account.buyerSpent")],
+      ["seller_pending", t("account.sellerPending")], ["seller_available", t("account.sellerAvailable")],
+      ["seller_payout_locked", t("account.payoutLocked")],
     ];
     return (
       <table><tbody>
@@ -71,45 +73,47 @@ export default function AccountPage() {
     <div>
       {/* ---- Wallet ---- */}
       <div className="card">
-        <div className="card-title">Wallet</div>
+        <div className="card-title">{t("account.wallet")}</div>
         {walletLoaded ? (
           <>
             <div style={{ marginTop: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
-              <span className="text-muted" style={{ fontSize: 12 }}>Address</span>
+              <span className="text-muted" style={{ fontSize: 12 }}>{t("account.address")}</span>
               <div className="font-mono" style={{ fontSize: 13, wordBreak: "break-all", marginTop: 2 }}>
                 {walletAddr}
               </div>
             </div>
             <div style={{ display: "flex", gap: "var(--space-sm)" }}>
               <button className="btn btn-secondary btn-sm" onClick={fetchBalance}>
-                {balanceLoading ? "Loading..." : "View Balance"}
+                {balanceLoading ? t("common.loading") : t("account.viewBalance")}
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => navigate("/wallet")}>
-                Manage Wallet
+                {t("account.manageWallet")}
               </button>
               <button className="btn btn-success btn-sm" onClick={openDeposit}>
-                Add Funds
+                {t("account.addFunds")}
               </button>
             </div>
           </>
         ) : (
-          <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>No wallet loaded.</p>
+          <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{t("account.noWallet")}</p>
         )}
       </div>
 
       {/* ---- Seller ---- */}
       <div className="card">
-        <div className="card-title">Seller</div>
+        <div className="card-title">{t("account.seller")}</div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginTop: "var(--space-sm)" }}>
           <span className={`status-dot ${seller.connected ? "status-dot-connected" : seller.running ? "status-dot-connected" : "status-dot-disconnected"}`}
             style={seller.running && !seller.connected ? { background: "#f5a623" } : undefined} />
           <span style={{ fontSize: 14, fontWeight: 500 }}>
-            {seller.connected ? "Running" : seller.running ? "Reconnecting..." : "Stopped"}
+            {seller.connected ? t("common.running") : seller.running ? t("common.reconnecting") : t("common.stopped")}
           </span>
         </div>
         {seller.streams.length > 0 && (
           <div className="font-mono" style={{ fontSize: 12, color: "#22c55e", marginTop: "var(--space-xs)" }}>
-            {seller.streams.length} active stream{seller.streams.length !== 1 ? "s" : ""}
+            {seller.streams.length === 1
+              ? t("account.streamsOne", { count: seller.streams.length })
+              : t("account.streamsOther", { count: seller.streams.length })}
           </div>
         )}
         {seller.error && (
@@ -117,21 +121,21 @@ export default function AccountPage() {
         )}
         <div style={{ marginTop: "var(--space-sm)" }}>
           <button className="btn btn-secondary btn-sm" onClick={() => navigate("/seller")}>
-            Seller Settings
+            {t("account.sellerSettings")}
           </button>
         </div>
       </div>
 
       {/* ---- System Info ---- */}
       <div className="card">
-        <div className="card-title">System</div>
+        <div className="card-title">{t("account.system")}</div>
         <table style={{ marginTop: "var(--space-sm)" }}><tbody>
-          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Data dir</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/</td></tr>
-          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Wallet</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/wallet/keyfile.enc</td></tr>
-          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Session</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/session_token</td></tr>
-          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Config</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/config.toml</td></tr>
-          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Version</td><td className="font-mono" style={{ fontSize: 12 }}>v{appInfo.version} <span style={{ color: "var(--color-mute)" }}>({appInfo.git_hash})</span></td></tr>
-          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Support</td><td className="font-mono" style={{ fontSize: 12 }}>humanshere@proxybase.xyz</td></tr>
+          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.dataDir")}</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/</td></tr>
+          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.walletPath")}</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/wallet/keyfile.enc</td></tr>
+          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.sessionPath")}</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/session_token</td></tr>
+          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.configPath")}</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/config.toml</td></tr>
+          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.version")}</td><td className="font-mono" style={{ fontSize: 12 }}>v{appInfo.version} <span style={{ color: "var(--color-mute)" }}>({appInfo.git_hash})</span></td></tr>
+          <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("common.support")}</td><td className="font-mono" style={{ fontSize: 12 }}>humanshere@proxybase.xyz</td></tr>
         </tbody></table>
       </div>
 
@@ -139,13 +143,13 @@ export default function AccountPage() {
       <div className="card">
         <a href="https://discord.gg/7uedk7ajHD" target="_blank" rel="noopener noreferrer"
           className="btn btn-secondary btn-sm" style={{ textDecoration: "none", width: "100%" }}>
-          Support
+          {t("common.support")}
         </a>
         <button className="btn btn-danger btn-sm" style={{ width: "100%", marginTop: "var(--space-xs)" }} onClick={handleLogout}>
-          Logout
+          {t("account.logout")}
         </button>
         <p className="text-muted" style={{ fontSize: 12, marginTop: "var(--space-sm)", textAlign: "center" }}>
-          All active sessions will be closed and the seller will be stopped.
+          {t("account.logoutWarning")}
         </p>
       </div>
 
@@ -154,11 +158,11 @@ export default function AccountPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => setShowBalance(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="card-title">Wallet Balance</div>
-            {balanceLoading ? (<p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>Loading...</p>)
+            <div className="card-title">{t("account.walletBalance")}</div>
+            {balanceLoading ? (<p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{t("common.loading")}</p>)
             : balance ? (<div style={{ marginTop: "var(--space-sm)" }}>{renderBalanceRows(balance)}</div>)
-            : (<p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>Failed to load balance.</p>)}
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setShowBalance(false)}>Close</button>
+            : (<p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{t("account.failedBalance")}</p>)}
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setShowBalance(false)}>{t("common.close")}</button>
           </div>
         </div>
       )}
@@ -169,14 +173,14 @@ export default function AccountPage() {
           onClick={() => setShowInfo(false)}>
           <div style={{ background: "var(--color-canvas)", borderRadius: "var(--rounded-md)", padding: "var(--space-xl)", maxWidth: 380, width: "90%", boxShadow: "var(--shadow-card)" }}
             onClick={(e) => e.stopPropagation()}>
-            <div className="card-title">App Info</div>
+            <div className="card-title">{t("account.appInfo")}</div>
             <table style={{ marginTop: "var(--space-sm)" }}><tbody>
-              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Data dir</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/</td></tr>
-              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Wallet</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/wallet/keyfile.enc</td></tr>
-              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Session</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/session_token</td></tr>
-              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>Config</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/config.toml</td></tr>
+              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.dataDir")}</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/</td></tr>
+              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.walletPath")}</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/wallet/keyfile.enc</td></tr>
+              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.sessionPath")}</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/session_token</td></tr>
+              <tr><td style={{ color: "var(--color-mute)", fontSize: 13, padding: "4px 12px 4px 0" }}>{t("account.configPath")}</td><td className="font-mono" style={{ fontSize: 12 }}>~/.proxybase/config.toml</td></tr>
             </tbody></table>
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setShowInfo(false)}>Close</button>
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-lg)", width: "100%" }} onClick={() => setShowInfo(false)}>{t("common.close")}</button>
           </div>
         </div>
       )}
