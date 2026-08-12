@@ -189,3 +189,97 @@ async fn test_bridge_start_stop() {
     // Port should no longer be tracked
     assert!(proxybase_gui_lib::bridge::bridge_port("test-2".to_string()).await.unwrap().is_none());
 }
+
+#[tokio::test]
+async fn test_bridge_start_is_idempotent() {
+    let upstream_port = fake_socks5_server().await;
+
+    let first = proxybase_gui_lib::bridge::start_bridge(
+        "idempotent".to_string(),
+        format!("127.0.0.1:{}", upstream_port),
+        "u".to_string(),
+        "p".to_string(),
+        None,
+    )
+    .await
+    .unwrap();
+
+    // A second start for the same session must return the existing port and
+    // must NOT stop/restart the healthy bridge (that is what used to make the
+    // port disappear).
+    let second = proxybase_gui_lib::bridge::start_bridge(
+        "idempotent".to_string(),
+        format!("127.0.0.1:{}", upstream_port),
+        "u".to_string(),
+        "p".to_string(),
+        Some(first),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(first, second, "bridge must not be restarted");
+    assert_eq!(
+        proxybase_gui_lib::bridge::bridge_port("idempotent".to_string()).await.unwrap(),
+        Some(first)
+    );
+
+    proxybase_gui_lib::bridge::stop_bridge("idempotent").await;
+}
+
+#[tokio::test]
+async fn test_bridge_restart_same_port_after_use() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpStream;
+
+    let upstream_port = fake_socks5_server().await;
+    let preferred = 23107u16; // fixed test port (distinct from other tests)
+
+    let port = proxybase_gui_lib::bridge::start_bridge(
+        "restart-port".to_string(),
+        format!("127.0.0.1:{}", upstream_port),
+        "u".to_string(),
+        "p".to_string(),
+        Some(preferred),
+    )
+    .await
+    .expect("first bridge start");
+    assert_eq!(port, preferred);
+
+    // Use the bridge so relay sockets exist on the bridge port. After they
+    // close, macOS leaves them in TIME_WAIT, which used to make an immediate
+    // rebind of the same port fail with EADDRINUSE.
+    let mut client = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    client.write_all(&[0x05, 0x01, 0x00]).await.unwrap();
+    let mut resp = [0u8; 2];
+    client.read_exact(&mut resp).await.unwrap();
+    assert_eq!(resp, [0x05, 0x00]);
+
+    let domain = b"example.com";
+    let mut req = vec![0x05, 0x01, 0x00, 0x03, domain.len() as u8];
+    req.extend_from_slice(domain);
+    req.extend_from_slice(&443u16.to_be_bytes());
+    client.write_all(&req).await.unwrap();
+    let mut reply = [0u8; 10];
+    client.read_exact(&mut reply).await.unwrap();
+    assert_eq!(reply[1], 0x00, "SOCKS5 connect should succeed");
+
+    // Close the client and give the relay a moment to tear its sockets down.
+    drop(client);
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Stop and IMMEDIATELY restart on the same port. With SO_REUSEADDR the
+    // rebind succeeds even while old connections are in TIME_WAIT (macOS).
+    proxybase_gui_lib::bridge::stop_bridge("restart-port").await;
+    let restarted = proxybase_gui_lib::bridge::start_bridge(
+        "restart-port".to_string(),
+        format!("127.0.0.1:{}", upstream_port),
+        "u".to_string(),
+        "p".to_string(),
+        Some(preferred),
+    )
+    .await
+    .expect("restart on same port must succeed");
+    assert_eq!(restarted, preferred);
+
+    proxybase_gui_lib::bridge::stop_bridge("restart-port").await;
+}

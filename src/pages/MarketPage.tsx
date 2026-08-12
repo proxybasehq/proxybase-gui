@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useOutletContext, Navigate } from "react-router-dom";
-import { listPricing, createSession, closeSession, listSessions, keepaliveSession, getToken, bridgeStart, bridgeStop } from "../api";
+import { listPricing, createSession, closeSession, listSessions, keepaliveSession, getToken, bridgeStart, bridgeStop, bridgePort } from "../api";
 import { load } from "@tauri-apps/plugin-store";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
@@ -57,6 +57,10 @@ export default function MarketPage() {
   const [connectModal, setConnectModal] = useState<Record<string, unknown> | null>(null);
   const [connectTab, setConnectTab] = useState<"remote" | "local">("remote");
   const [bridgePorts, setBridgePorts] = useState<Record<string, number>>({});
+  // Live mirror of bridgePorts for async paths (SSE, timers, effects) so they
+  // never operate on a stale closure snapshot taken at mount time.
+  const bridgePortsRef = useRef<Record<string, number>>({});
+  const nextPortRef = useRef(10800);
   const [token, setToken] = useState("");
 
   async function fetchPrices() {
@@ -81,30 +85,36 @@ export default function MarketPage() {
   async function loadBridgePorts(): Promise<Record<string, number>> {
     try {
       const store = await load("proxybase-settings.json");
-      return await store.get<Record<string, number>>("bridge_ports") || {};
+      const ports = await store.get<Record<string, number>>("bridge_ports") || {};
+      // Fresh ports are always allocated above any port we've ever persisted,
+      // so a new session never collides with a just-closed session's TIME_WAIT.
+      for (const p of Object.values(ports)) {
+        if (typeof p === "number" && p >= nextPortRef.current) nextPortRef.current = p + 1;
+      }
+      return ports;
     } catch (_) { return {}; }
   }
 
-  // ── Stable port registry: country:type → port ──
-  const PORT_REGISTRY_KEY = "port_registry";
-  const nextPortRef = useRef(10800);
-
-  async function loadPortRegistry(): Promise<Record<string, number>> {
-    try {
-      const store = await load("proxybase-settings.json");
-      const registry = await store.get<Record<string, number>>(PORT_REGISTRY_KEY) || {};
-      // Find highest port to continue from
-      for (const p of Object.values(registry)) { if (p >= nextPortRef.current) nextPortRef.current = p + 1; }
-      return registry;
-    } catch (_) { return {}; }
+  function setPorts(ports: Record<string, number>) {
+    bridgePortsRef.current = ports;
+    setBridgePorts(ports);
   }
 
-  async function savePortRegistry(registry: Record<string, number>) {
+  /// Ask the backend whether this session's bridge is actually running and
+  /// start one only when it isn't. Restarting a healthy bridge is what used
+  /// to make the port vanish (TIME_WAIT/EADDRINUSE on macOS).
+  async function ensureBridge(sid: string, t: string, preferred?: number): Promise<number | null> {
     try {
-      const store = await load("proxybase-settings.json");
-      await store.set(PORT_REGISTRY_KEY, registry);
-      await store.save();
-    } catch (_) {}
+      const running = await bridgePort(sid);
+      if (running) return running;
+    } catch (_) { /* fall through to start */ }
+    try {
+      const port = await bridgeStart(sid, PROXY_ADDRESS, sid, t, preferred);
+      if (typeof port === "number" && port >= nextPortRef.current) nextPortRef.current = port + 1;
+      return port;
+    } catch (_) {
+      return null;
+    }
   }
 
   // ── Session keepalive timer (every 5 minutes) ──
@@ -124,60 +134,55 @@ export default function MarketPage() {
     return () => clearInterval(interval);
   }, [backendUrl]);
 
-  async function fetchSessions(currentPorts?: Record<string, number>) {
-    try {
-      const r = await listSessions(backendUrl);
-      const active: Array<Record<string, unknown>> = (r as any).sessions || [];
-      setSessions(active);
+  // Serialize session/bridge reconciliation so concurrent triggers (SSE,
+  // refresh, buy, close, resume) can never race each other's stop/start cycle.
+  const reconcileQueue = useRef<Promise<void>>(Promise.resolve());
+  function fetchSessions() {
+    const run = async () => {
+      try {
+        const r = await listSessions(backendUrl);
+        const active: Array<Record<string, unknown>> = (r as any).sessions || [];
+        setSessions(active);
 
-      // Restart local bridges for sessions that lost state after app restart
-      let t = token;
-      if (!t) {
-        t = await getToken().catch(() => "");
-        if (t) setToken(t);
-      }
-      if (t) {
+        let t = token;
+        if (!t) {
+          t = await getToken().catch(() => "");
+          if (t) setToken(t);
+        }
+        if (!t) return;
+
         const savedPorts = await loadBridgePorts();
         const activeIds = new Set(active.map((s) => (s as any).session_id).filter(Boolean));
-        const portsSource = currentPorts || bridgePorts;
-        const newPorts: Record<string, number> = {};
+        const merged: Record<string, number> = { ...bridgePortsRef.current };
 
-        // Load stable port registry for country:type → port mapping
-        const portRegistry = await loadPortRegistry();
-
-        // Stop bridges for expired sessions BEFORE starting new ones
+        // Sessions that no longer exist: stop and forget their bridges.
         for (const sid of Object.keys(savedPorts)) {
           if (!activeIds.has(sid)) {
             await bridgeStop(sid).catch(() => {});
+            delete merged[sid];
           }
         }
 
+        // Every active session gets one authoritative check against the backend
+        // registry; we only start a bridge when the backend says there isn't
+        // one (e.g. after app restart). Healthy bridges are never restarted.
         for (const sid of activeIds) {
-          if (!portsSource[sid as string]) {
-            try {
-              // Prefer stable port from registry (country:type), fall back to session-specific
-              const session = active.find((s) => (s as any).session_id === sid);
-              const countryType = session ? `${(session as any).country}:${(session as any).network_type}` : null;
-              const preferred = (countryType ? portRegistry[countryType] : undefined)
-                || savedPorts[sid as string]
-                || undefined;
-              const port = await bridgeStart(sid as string, PROXY_ADDRESS, sid as string, t, preferred);
-              newPorts[sid as string] = port;
-              // Update port registry only if we got the expected stable port
-              if (countryType && port === preferred) {
-                portRegistry[countryType] = port;
-              }
-            } catch (_) { /* bridge start is best-effort */ }
+          const s = sid as string;
+          const preferred = savedPorts[s] || bridgePortsRef.current[s] || undefined;
+          const port = await ensureBridge(s, t, preferred);
+          if (port) {
+            merged[s] = port;
           } else {
-            newPorts[sid as string] = portsSource[sid as string];
+            delete merged[s];
           }
         }
 
-        setBridgePorts(newPorts);
-        await saveBridgePorts(newPorts);
-        await savePortRegistry(portRegistry);
-      }
-    } catch (_) { /* ignore */ }
+        setPorts(merged);
+        await saveBridgePorts(merged);
+      } catch (_) { /* ignore */ }
+    };
+    reconcileQueue.current = reconcileQueue.current.then(run, run);
+    return reconcileQueue.current;
   }
 
   async function fetchToken() {
@@ -190,11 +195,11 @@ export default function MarketPage() {
       await closeSession(backendUrl, sessionId);
       await bridgeStop(sessionId);
       track(TrackEvent.SESSION_CLOSE, { sessionId });
-      const nextPorts = { ...bridgePorts };
-      delete nextPorts[sessionId];
-      setBridgePorts(nextPorts);
-      await saveBridgePorts(nextPorts);
-      await fetchSessions(nextPorts);
+      const next = { ...bridgePortsRef.current };
+      delete next[sessionId];
+      setPorts(next);
+      await saveBridgePorts(next);
+      await fetchSessions();
     } catch (e) { setError(String(e)); }
     setClosingId(null);
   }
@@ -210,24 +215,17 @@ export default function MarketPage() {
       const sid = (session as any).session_id;
       if (sid && token) {
         try {
-          // Stable port: reuse port from registry or allocate next
-          const portRegistry = await loadPortRegistry();
-          const preferredPort = portRegistry[countryTypeKey] || nextPortRef.current;
-          if (!portRegistry[countryTypeKey]) {
-            portRegistry[countryTypeKey] = preferredPort;
-            nextPortRef.current += 1;
-            await savePortRegistry(portRegistry);
+          // Stable per-session port: reuse this session's saved port if it has
+          // one, otherwise allocate a fresh port above every port ever used.
+          const savedPorts = await loadBridgePorts();
+          const preferred = savedPorts[sid as string] || nextPortRef.current;
+          const port = await ensureBridge(sid as string, token, preferred);
+          if (port) {
+            const next = { ...bridgePortsRef.current, [sid as string]: port };
+            setPorts(next);
+            await saveBridgePorts(next);
           }
-          const port = await bridgeStart(sid, PROXY_ADDRESS, sid, token, preferredPort);
-          // Update registry only if we got the expected stable port
-          if (port === preferredPort) {
-            portRegistry[countryTypeKey] = port;
-          }
-          await savePortRegistry(portRegistry);
-          const nextPorts = { ...bridgePorts, [sid]: port };
-          setBridgePorts(nextPorts);
-          await saveBridgePorts(nextPorts);
-          await fetchSessions(nextPorts);
+          await fetchSessions();
         } catch (_) {
           await fetchSessions();
         }
@@ -255,6 +253,26 @@ export default function MarketPage() {
     fetchSessions();
     if (activeTab === "prices") fetchPrices();
   }, [activeTab]);
+
+  // When the connection modal opens, reconcile that session's port with the
+  // backend so the local bridge section never shows a stale "?" for a bridge
+  // that is actually running.
+  useEffect(() => {
+    const sid = (connectModal as any)?.session_id as string | undefined;
+    if (!sid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const port = await bridgePort(sid);
+        if (!cancelled && port && !bridgePortsRef.current[sid]) {
+          const next = { ...bridgePortsRef.current, [sid]: port };
+          setPorts(next);
+          await saveBridgePorts(next);
+        }
+      } catch (_) { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [connectModal]);
 
   // SSE Real-time Updates
   useEffect(() => {

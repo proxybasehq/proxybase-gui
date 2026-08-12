@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 
 use crate::api::BackendClient;
@@ -35,6 +34,7 @@ pub async fn bridge_port(session_id: String) -> Result<Option<u16>, String> {
 /// A running local bridge instance — unauthenticated SOCKS5 → authenticated upstream.
 struct Bridge {
     shutdown_tx: tokio::sync::oneshot::Sender<()>,
+    task: tokio::task::JoinHandle<()>,
     local_port: u16,
 }
 
@@ -51,23 +51,47 @@ pub async fn start_bridge(
     upstream_password: String,
     preferred_port: Option<u16>,
 ) -> Result<u16, String> {
-    // Stop existing bridge for this session if any
-    stop_bridge(&session_id).await;
-
-    // Also reclaim the preferred port from any other bridge that may hold it
-    if let Some(port) = preferred_port {
-        stop_bridge_on_port(port).await;
+    // Idempotent start: if this session already has a healthy bridge, keep it.
+    // Restarting it would drop the stable port (and any live tunnels) for no
+    // benefit — the upstream token is already reloaded on every connection.
+    // The lock is held across bind+insert so two concurrent starts for the
+    // same session can never both bind and orphan a listener.
+    let mut bridges = BRIDGES.lock().await;
+    if let Some(bridge) = bridges.get(&session_id) {
+        return Ok(bridge.local_port);
     }
 
-    // Bind to preferred port strictly — never fall back to random
+    // If the preferred port is owned by ANOTHER session's bridge, leave that
+    // bridge alone and fall back to an ephemeral port instead of killing it.
     let bind_addr = if let Some(port) = preferred_port {
-        format!("127.0.0.1:{}", port)
+        let owned_by_other = bridges.values().any(|b| b.local_port == port);
+        if owned_by_other {
+            "127.0.0.1:0".to_string()
+        } else {
+            format!("127.0.0.1:{}", port)
+        }
     } else {
         "127.0.0.1:0".to_string()
     };
-    let listener = TcpListener::bind(&bind_addr)
-        .await
+
+    // SO_REUSEADDR is required on macOS/BSD to rebind a stable port while old
+    // relay connections are still in TIME_WAIT. Without it, a restart fails
+    // with EADDRINUSE and the bridge port silently disappears.
+    let socket = tokio::net::TcpSocket::new_v4()
+        .map_err(|e| format!("Failed to create bridge socket: {}", e))?;
+    socket
+        .set_reuseaddr(true)
+        .map_err(|e| format!("Failed to set SO_REUSEADDR: {}", e))?;
+    socket
+        .bind(
+            bind_addr
+                .parse::<std::net::SocketAddr>()
+                .map_err(|e| format!("Invalid bridge bind addr {}: {}", bind_addr, e))?,
+        )
         .map_err(|e| format!("Failed to bind bridge on {}: {}", bind_addr, e))?;
+    let listener = socket
+        .listen(1024)
+        .map_err(|e| format!("Failed to listen on {}: {}", bind_addr, e))?;
     let local_port = listener
         .local_addr()
         .map_err(|e| format!("Failed to get local addr: {}", e))?
@@ -76,7 +100,7 @@ pub async fn start_bridge(
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
     let sid = session_id.clone();
-    tokio::spawn(async move {
+    let task = tokio::spawn(async move {
         eprintln!("[bridge {}] Started on port {}", sid, local_port);
 
         loop {
@@ -113,11 +137,11 @@ pub async fn start_bridge(
         }
     });
 
-    let mut bridges = BRIDGES.lock().await;
     bridges.insert(
         session_id,
         Bridge {
             shutdown_tx,
+            task,
             local_port,
         },
     );
@@ -127,27 +151,22 @@ pub async fn start_bridge(
 
 /// Stop the bridge for a given session.
 pub async fn stop_bridge(session_id: &str) {
-    let mut bridges = BRIDGES.lock().await;
-    if let Some(bridge) = bridges.remove(session_id) {
+    let bridge = {
+        let mut bridges = BRIDGES.lock().await;
+        bridges.remove(session_id)
+    };
+    if let Some(bridge) = bridge {
         let _ = bridge.shutdown_tx.send(());
-        eprintln!("[bridge {}] Stop signal sent", session_id);
-    }
-}
-
-/// Stop any bridge currently listening on the given local port,
-/// regardless of which session owns it. Used to reclaim a port
-/// before starting a new bridge that needs the same port.
-pub async fn stop_bridge_on_port(port: u16) {
-    let mut bridges = BRIDGES.lock().await;
-    let sid = bridges
-        .iter()
-        .find(|(_, b)| b.local_port == port)
-        .map(|(k, _)| k.clone());
-    if let Some(sid) = sid {
-        if let Some(bridge) = bridges.remove(&sid) {
-            let _ = bridge.shutdown_tx.send(());
-            eprintln!("[bridge {}] Stopped (port {} reclaimed)", sid, port);
-        }
+        // Wait (bounded) for the listener task to actually exit so the port is
+        // guaranteed released before a caller rebinds it. Previously the stop
+        // returned immediately and a restart could race the old listener's
+        // teardown, failing with EADDRINUSE.
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            bridge.task,
+        )
+        .await;
+        eprintln!("[bridge {}] Stopped", session_id);
     }
 }
 
