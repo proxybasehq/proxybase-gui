@@ -210,6 +210,13 @@ const ko: Messages = {
   "account.configPath": "설정",
   "account.version": "버전",
   "account.logout": "로그아웃",
+  "account.checkUpdate": "업데이트 확인",
+  "account.checkingUpdate": "업데이트 확인 중…",
+  "account.upToDate": "최신 버전을 사용 중입니다",
+  "account.updateAvailable": "새 버전 v{version}이 있습니다. 설치하고 다시 시작할까요?",
+  "account.installUpdate": "설치",
+  "account.downloadingUpdate": "업데이트 다운로드 중…",
+  "account.updateError": "업데이트 확인 실패",
   "account.logoutWarning":
     "모든 활성 세션이 닫히고 판매자가 중지됩니다.",
   "account.walletBalance": "지갑 잔액",

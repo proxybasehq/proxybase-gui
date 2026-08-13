@@ -215,6 +215,13 @@ const en = {
   "account.configPath": "Config",
   "account.version": "Version",
   "account.logout": "Logout",
+  "account.checkUpdate": "Check Update",
+  "account.checkingUpdate": "Checking for updates…",
+  "account.upToDate": "You're running the latest version",
+  "account.updateAvailable": "New version v{version} available. Install and restart?",
+  "account.installUpdate": "Install",
+  "account.downloadingUpdate": "Downloading update…",
+  "account.updateError": "Update check failed",
   "account.logoutWarning":
     "All active sessions will be closed and the seller will be stopped.",
   "account.walletBalance": "Wallet Balance",

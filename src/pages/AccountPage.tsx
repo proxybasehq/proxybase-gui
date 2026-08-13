@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useOutletContext, Navigate, useNavigate } from "react-router-dom";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
@@ -6,6 +6,8 @@ import { getBalance } from "../api";
 import { formatUsd } from "../utils";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "../i18n";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 interface AppInfo {
   version: string;
@@ -40,6 +42,56 @@ export default function AccountPage() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [showBalance, setShowBalance] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+
+  type UpdatePhase =
+    | { kind: "idle" }
+    | { kind: "checking" }
+    | { kind: "uptodate" }
+    | { kind: "available"; version: string }
+    | { kind: "downloading"; progress: number | null }
+    | { kind: "error" };
+  const [updatePhase, setUpdatePhase] = useState<UpdatePhase>({ kind: "idle" });
+  const updateRef = useRef<Update | null>(null);
+  const downloadTotalRef = useRef<number>(0);
+
+  async function handleCheckUpdate() {
+    setUpdatePhase({ kind: "checking" });
+    try {
+      const update = await check();
+      if (!update) {
+        setUpdatePhase({ kind: "uptodate" });
+        return;
+      }
+      updateRef.current = update;
+      setUpdatePhase({ kind: "available", version: update.version });
+    } catch (e) {
+      console.error("Update check failed:", e);
+      setUpdatePhase({ kind: "error" });
+    }
+  }
+
+  async function handleInstallUpdate() {
+    const update = updateRef.current;
+    if (!update) return;
+    setUpdatePhase({ kind: "downloading", progress: null });
+    try {
+      await update.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          downloadTotalRef.current = event.data?.contentLength ?? 0;
+        } else if (event.event === "Progress" && event.data) {
+          const total = downloadTotalRef.current;
+          const pct = total > 0
+            ? Math.min(100, Math.round((event.data.chunkLength / total) * 100))
+            : null;
+          setUpdatePhase({ kind: "downloading", progress: pct });
+        }
+      });
+      await relaunch();
+    } catch (e) {
+      console.error("Update install failed:", e);
+      setUpdatePhase({ kind: "error" });
+    }
+  }
 
   async function fetchBalance() {
     setShowBalance(true);
@@ -145,6 +197,22 @@ export default function AccountPage() {
           className="btn btn-secondary btn-sm" style={{ textDecoration: "none", width: "100%" }}>
           {t("common.support")}
         </a>
+        <button className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: "var(--space-xs)" }}
+          onClick={handleCheckUpdate}
+          disabled={updatePhase.kind === "checking" || updatePhase.kind === "downloading"}>
+          {updatePhase.kind === "checking" ? t("account.checkingUpdate")
+            : updatePhase.kind === "downloading"
+              ? `${t("account.downloadingUpdate")}${updatePhase.progress !== null ? ` (${updatePhase.progress}%)` : ""}`
+            : t("account.checkUpdate")}
+        </button>
+        {updatePhase.kind === "uptodate" && (
+          <p className="text-muted" style={{ fontSize: 12, marginTop: "var(--space-xs)", textAlign: "center" }}>
+            {t("account.upToDate")}
+          </p>
+        )}
+        {updatePhase.kind === "error" && (
+          <div className="alert alert-error" style={{ marginTop: "var(--space-xs)" }}>{t("account.updateError")}</div>
+        )}
         <button className="btn btn-danger btn-sm" style={{ width: "100%", marginTop: "var(--space-xs)" }} onClick={handleLogout}>
           {t("account.logout")}
         </button>
@@ -152,6 +220,28 @@ export default function AccountPage() {
           {t("account.logoutWarning")}
         </p>
       </div>
+
+      {/* ---- Update Modal ---- */}
+      {updatePhase.kind === "available" && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setUpdatePhase({ kind: "idle" })}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="card-title">{t("account.checkUpdate")}</div>
+            <p style={{ marginTop: "var(--space-sm)", fontSize: 14 }}>
+              {t("account.updateAvailable", { version: updatePhase.version })}
+            </p>
+            <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
+              <button className="btn btn-secondary btn-sm" style={{ flex: 1 }}
+                onClick={() => setUpdatePhase({ kind: "idle" })}>
+                {t("common.cancel")}
+              </button>
+              <button className="btn btn-success btn-sm" style={{ flex: 1 }} onClick={handleInstallUpdate}>
+                {t("account.installUpdate")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ---- Balance Modal ---- */}
       {showBalance && (

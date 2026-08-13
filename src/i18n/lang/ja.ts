@@ -212,6 +212,13 @@ const ja: Messages = {
   "account.configPath": "設定",
   "account.version": "バージョン",
   "account.logout": "ログアウト",
+  "account.checkUpdate": "アップデートを確認",
+  "account.checkingUpdate": "アップデートを確認中…",
+  "account.upToDate": "最新バージョンです",
+  "account.updateAvailable": "新しいバージョン v{version} があります。インストールして再起動しますか？",
+  "account.installUpdate": "インストール",
+  "account.downloadingUpdate": "アップデートをダウンロード中…",
+  "account.updateError": "アップデートの確認に失敗しました",
   "account.logoutWarning":
     "すべてのアクティブなセッションが閉じられ、販売者が停止されます。",
   "account.walletBalance": "ウォレット残高",

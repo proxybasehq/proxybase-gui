@@ -219,6 +219,13 @@ const fr: Messages = {
   "account.configPath": "Configuration",
   "account.version": "Version",
   "account.logout": "Déconnexion",
+  "account.checkUpdate": "Vérifier les mises à jour",
+  "account.checkingUpdate": "Vérification des mises à jour…",
+  "account.upToDate": "Vous utilisez la dernière version",
+  "account.updateAvailable": "Nouvelle version v{version} disponible. Installer et redémarrer ?",
+  "account.installUpdate": "Installer",
+  "account.downloadingUpdate": "Téléchargement de la mise à jour…",
+  "account.updateError": "Échec de la vérification des mises à jour",
   "account.logoutWarning":
     "Toutes les sessions actives seront fermées et le vendeur sera arrêté.",
   "account.walletBalance": "Solde du portefeuille",

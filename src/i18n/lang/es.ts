@@ -217,6 +217,13 @@ const es: Messages = {
   "account.configPath": "Configuración",
   "account.version": "Versión",
   "account.logout": "Cerrar sesión",
+  "account.checkUpdate": "Buscar actualizaciones",
+  "account.checkingUpdate": "Comprobando actualizaciones…",
+  "account.upToDate": "Estás usando la última versión",
+  "account.updateAvailable": "Nueva versión v{version} disponible. ¿Instalar y reiniciar?",
+  "account.installUpdate": "Instalar",
+  "account.downloadingUpdate": "Descargando actualización…",
+  "account.updateError": "Error al comprobar actualizaciones",
   "account.logoutWarning":
     "Todas las sesiones activas se cerrarán y el vendedor se detendrá.",
   "account.walletBalance": "Saldo de la cartera",

@@ -211,6 +211,13 @@ const ar: Messages = {
   "account.configPath": "الإعدادات",
   "account.version": "الإصدار",
   "account.logout": "تسجيل الخروج",
+  "account.checkUpdate": "التحقق من التحديثات",
+  "account.checkingUpdate": "جارٍ التحقق من التحديثات…",
+  "account.upToDate": "أنت تستخدم أحدث إصدار",
+  "account.updateAvailable": "يتوفر إصدار جديد v{version}. التثبيت وإعادة التشغيل؟",
+  "account.installUpdate": "تثبيت",
+  "account.downloadingUpdate": "جارٍ تنزيل التحديث…",
+  "account.updateError": "فشل التحقق من التحديثات",
   "account.logoutWarning":
     "سيتم إغلاق جميع الجلسات النشطة وإيقاف البائع.",
   "account.walletBalance": "رصيد المحفظة",

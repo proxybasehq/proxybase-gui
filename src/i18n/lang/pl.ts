@@ -212,6 +212,13 @@ const pl: Messages = {
   "account.configPath": "Konfiguracja",
   "account.version": "Wersja",
   "account.logout": "Wyloguj się",
+  "account.checkUpdate": "Sprawdź aktualizacje",
+  "account.checkingUpdate": "Sprawdzanie aktualizacji…",
+  "account.upToDate": "Masz najnowszą wersję",
+  "account.updateAvailable": "Dostępna jest nowa wersja v{version}. Zainstalować i uruchomić ponownie?",
+  "account.installUpdate": "Zainstaluj",
+  "account.downloadingUpdate": "Pobieranie aktualizacji…",
+  "account.updateError": "Nie udało się sprawdzić aktualizacji",
   "account.logoutWarning":
     "Wszystkie aktywne sesje zostaną zamknięte, a sprzedawca zatrzymany.",
   "account.walletBalance": "Saldo portfela",

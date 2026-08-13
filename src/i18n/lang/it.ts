@@ -220,6 +220,13 @@ const it: Messages = {
   "account.configPath": "Configurazione",
   "account.version": "Versione",
   "account.logout": "Esci",
+  "account.checkUpdate": "Controlla aggiornamenti",
+  "account.checkingUpdate": "Controllo aggiornamenti…",
+  "account.upToDate": "Stai usando l'ultima versione",
+  "account.updateAvailable": "Nuova versione v{version} disponibile. Installare e riavviare?",
+  "account.installUpdate": "Installa",
+  "account.downloadingUpdate": "Download dell'aggiornamento…",
+  "account.updateError": "Controllo aggiornamenti non riuscito",
   "account.logoutWarning":
     "Tutte le sessioni attive verranno chiuse e il venditore verrà fermato.",
   "account.walletBalance": "Saldo del portafoglio",

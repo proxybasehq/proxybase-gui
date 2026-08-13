@@ -210,6 +210,13 @@ const vi: Messages = {
   "account.configPath": "Cấu hình",
   "account.version": "Phiên bản",
   "account.logout": "Đăng xuất",
+  "account.checkUpdate": "Kiểm tra cập nhật",
+  "account.checkingUpdate": "Đang kiểm tra cập nhật…",
+  "account.upToDate": "Bạn đang dùng phiên bản mới nhất",
+  "account.updateAvailable": "Đã có phiên bản mới v{version}. Cài đặt và khởi động lại?",
+  "account.installUpdate": "Cài đặt",
+  "account.downloadingUpdate": "Đang tải bản cập nhật…",
+  "account.updateError": "Kiểm tra cập nhật thất bại",
   "account.logoutWarning":
     "Tất cả phiên hoạt động sẽ bị đóng và người bán sẽ bị dừng.",
   "account.walletBalance": "Số dư ví",

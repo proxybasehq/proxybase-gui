@@ -217,6 +217,13 @@ const uk: Messages = {
   "account.configPath": "Конфігурація",
   "account.version": "Версія",
   "account.logout": "Вийти",
+  "account.checkUpdate": "Перевірити оновлення",
+  "account.checkingUpdate": "Перевірка оновлень…",
+  "account.upToDate": "У вас остання версія",
+  "account.updateAvailable": "Доступна нова версія v{version}. Встановити й перезапустити?",
+  "account.installUpdate": "Встановити",
+  "account.downloadingUpdate": "Завантаження оновлення…",
+  "account.updateError": "Не вдалося перевірити оновлення",
   "account.logoutWarning":
     "Усі активні сесії буде закрито, а продавця зупинено.",
   "account.walletBalance": "Баланс гаманця",

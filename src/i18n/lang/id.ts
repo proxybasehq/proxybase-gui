@@ -211,6 +211,13 @@ const id: Messages = {
   "account.configPath": "Konfigurasi",
   "account.version": "Versi",
   "account.logout": "Keluar",
+  "account.checkUpdate": "Periksa Pembaruan",
+  "account.checkingUpdate": "Memeriksa pembaruan…",
+  "account.upToDate": "Anda menggunakan versi terbaru",
+  "account.updateAvailable": "Versi baru v{version} tersedia. Pasang dan mulai ulang?",
+  "account.installUpdate": "Pasang",
+  "account.downloadingUpdate": "Mengunduh pembaruan…",
+  "account.updateError": "Pemeriksaan pembaruan gagal",
   "account.logoutWarning":
     "Semua sesi aktif akan ditutup dan penjual akan dihentikan.",
   "account.walletBalance": "Saldo Dompet",

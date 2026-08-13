@@ -219,6 +219,13 @@ const de: Messages = {
   "account.configPath": "Konfiguration",
   "account.version": "Version",
   "account.logout": "Abmelden",
+  "account.checkUpdate": "Nach Updates suchen",
+  "account.checkingUpdate": "Suche nach Updates…",
+  "account.upToDate": "Sie nutzen die neueste Version",
+  "account.updateAvailable": "Neue Version v{version} verfügbar. Installieren und neu starten?",
+  "account.installUpdate": "Installieren",
+  "account.downloadingUpdate": "Update wird heruntergeladen…",
+  "account.updateError": "Update-Prüfung fehlgeschlagen",
   "account.logoutWarning":
     "Alle aktiven Sitzungen werden geschlossen und der Verkäufer gestoppt.",
   "account.walletBalance": "Wallet-Saldo",

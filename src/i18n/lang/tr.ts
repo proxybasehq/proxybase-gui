@@ -212,6 +212,13 @@ const tr: Messages = {
   "account.configPath": "Yapılandırma",
   "account.version": "Sürüm",
   "account.logout": "Çıkış yap",
+  "account.checkUpdate": "Güncellemeyi Kontrol Et",
+  "account.checkingUpdate": "Güncellemeler kontrol ediliyor…",
+  "account.upToDate": "En son sürümü kullanıyorsunuz",
+  "account.updateAvailable": "Yeni sürüm v{version} mevcut. Kurulsun ve yeniden başlatılsın mı?",
+  "account.installUpdate": "Kur",
+  "account.downloadingUpdate": "Güncelleme indiriliyor…",
+  "account.updateError": "Güncelleme kontrolü başarısız oldu",
   "account.logoutWarning":
     "Tüm aktif oturumlar kapatılacak ve satıcı durdurulacak.",
   "account.walletBalance": "Cüzdan bakiyesi",

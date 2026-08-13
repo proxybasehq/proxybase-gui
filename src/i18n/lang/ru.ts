@@ -220,6 +220,13 @@ const ru: Messages = {
   "account.configPath": "Конфигурация",
   "account.version": "Версия",
   "account.logout": "Выйти",
+  "account.checkUpdate": "Проверить обновления",
+  "account.checkingUpdate": "Проверка обновлений…",
+  "account.upToDate": "У вас последняя версия",
+  "account.updateAvailable": "Доступна новая версия v{version}. Установить и перезапустить?",
+  "account.installUpdate": "Установить",
+  "account.downloadingUpdate": "Загрузка обновления…",
+  "account.updateError": "Не удалось проверить обновления",
   "account.logoutWarning":
     "Все активные сессии будут закрыты, а продавец остановлен.",
   "account.walletBalance": "Баланс кошелька",
