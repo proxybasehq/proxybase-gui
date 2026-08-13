@@ -47,8 +47,10 @@ export default function WelcomePage() {
       await login(backendUrl, "");
       navigate("/market", { replace: true });
     } catch (e) {
-      setStep("no-wallet");
-      setError(t("welcome.autoLoginFailed"));
+      // A wallet exists but couldn't be auto-logged-in (password-protected
+      // wallet, or backend unreachable). Send the user to the login page —
+      // showing create/import here would offer to overwrite their wallet.
+      navigate("/login", { replace: true });
     }
   }
 

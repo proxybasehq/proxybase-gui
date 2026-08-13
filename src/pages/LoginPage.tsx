@@ -62,10 +62,12 @@ export default function LoginPage() {
       ) : (
         <div className="card">
           <div className="card-title">{t("login.authenticate")}</div>
-          <div className="form-group">
-            <label className="form-label">{t("login.walletAddress")}</label>
-            <code className="font-mono word-break" style={{ fontSize: 13 }}>{walletAddr}</code>
-          </div>
+          {walletAddr && (
+            <div className="form-group">
+              <label className="form-label">{t("login.walletAddress")}</label>
+              <code className="font-mono word-break" style={{ fontSize: 13 }}>{walletAddr}</code>
+            </div>
+          )}
           <PasswordInput
             label={t("login.walletPassword")}
             value={password}

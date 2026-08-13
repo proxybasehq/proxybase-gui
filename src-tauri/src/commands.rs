@@ -174,17 +174,45 @@ pub fn wallet_import(
 #[tauri::command]
 pub fn wallet_info(app_handle: tauri::AppHandle) -> Result<WalletInfo, String> {
     let data_dir = crate::ensure_proxybase_dir(&app_handle);
-    let mut wm = libproxybase::WalletManager::new(data_dir).map_err(|e| e.to_string())?;
-    match wm.load("") {
-        Ok(()) => Ok(WalletInfo {
-            address: wm.address().unwrap_or("unknown").to_string(),
-            loaded: true,
-        }),
-        Err(_) => Ok(WalletInfo {
+    let cached = WALLET_PASSWORD
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    wallet_info_for_dir(&data_dir, &cached)
+}
+
+/// A wallet "exists" whenever the keyfile is present on disk — decryption is
+/// NOT required. Previously this tried only `wm.load("")`, so a password-
+/// protected wallet reported `loaded: false` and the whole app treated the
+/// user as having no wallet: no login form, no market/seller tabs, and the
+/// welcome screen offered to create a wallet over the existing one.
+///
+/// The address is resolved best-effort: cached password first, then empty
+/// (unencrypted wallets). Without either, the address stays empty until the
+/// user logs in — but `loaded` is still true.
+fn wallet_info_for_dir(data_dir: &std::path::Path, cached_password: &str) -> Result<WalletInfo, String> {
+    let mut wm =
+        libproxybase::WalletManager::new(data_dir.to_path_buf()).map_err(|e| e.to_string())?;
+    if !wm.exists() {
+        return Ok(WalletInfo {
             address: String::new(),
             loaded: false,
-        }),
+        });
     }
+    let passwords: Vec<&str> = if cached_password.is_empty() {
+        vec![""]
+    } else {
+        vec![cached_password, ""]
+    };
+    let address = wm
+        .try_load(&passwords)
+        .ok()
+        .and_then(|_| wm.address().map(|a| a.to_string()))
+        .unwrap_or_default();
+    Ok(WalletInfo {
+        address,
+        loaded: true,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -422,5 +450,74 @@ pub fn get_app_info() -> AppInfo {
 pub fn ui_heartbeat(state: tauri::State<'_, crate::UiWatchdog>) {
     if let Ok(mut last) = state.last_heartbeat.lock() {
         *last = std::time::Instant::now();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_wallet_dir() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
+
+    #[test]
+    fn wallet_info_no_keyfile_reports_not_loaded() {
+        let dir = temp_wallet_dir();
+        let info = wallet_info_for_dir(dir.path(), "").unwrap();
+        assert!(!info.loaded);
+        assert!(info.address.is_empty());
+    }
+
+    #[test]
+    fn wallet_info_empty_password_wallet_loads_with_address() {
+        let dir = temp_wallet_dir();
+        let mut wm = libproxybase::WalletManager::new(dir.path().to_path_buf()).unwrap();
+        wm.create("").unwrap();
+        let addr = wm.address().unwrap().to_string();
+        drop(wm);
+
+        let info = wallet_info_for_dir(dir.path(), "").unwrap();
+        assert!(info.loaded);
+        assert_eq!(info.address, addr);
+    }
+
+    #[test]
+    fn wallet_info_password_wallet_reports_loaded_without_password() {
+        // Regression: password-protected wallets used to report loaded=false,
+        // which locked users out of login and hid the market/seller tabs.
+        let dir = temp_wallet_dir();
+        let mut wm = libproxybase::WalletManager::new(dir.path().to_path_buf()).unwrap();
+        wm.create("secret").unwrap();
+        drop(wm);
+
+        let info = wallet_info_for_dir(dir.path(), "").unwrap();
+        assert!(info.loaded, "password wallet must still be reported as loaded");
+        assert!(info.address.is_empty(), "address unknown without the password");
+    }
+
+    #[test]
+    fn wallet_info_password_wallet_resolves_address_with_cached_password() {
+        let dir = temp_wallet_dir();
+        let mut wm = libproxybase::WalletManager::new(dir.path().to_path_buf()).unwrap();
+        wm.create("secret").unwrap();
+        let addr = wm.address().unwrap().to_string();
+        drop(wm);
+
+        let info = wallet_info_for_dir(dir.path(), "secret").unwrap();
+        assert!(info.loaded);
+        assert_eq!(info.address, addr);
+    }
+
+    #[test]
+    fn wallet_info_wrong_cached_password_still_reports_loaded() {
+        let dir = temp_wallet_dir();
+        let mut wm = libproxybase::WalletManager::new(dir.path().to_path_buf()).unwrap();
+        wm.create("secret").unwrap();
+        drop(wm);
+
+        let info = wallet_info_for_dir(dir.path(), "wrong-password").unwrap();
+        assert!(info.loaded, "decryption failure must not hide an existing wallet");
+        assert!(info.address.is_empty());
     }
 }
