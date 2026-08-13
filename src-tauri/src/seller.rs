@@ -541,13 +541,11 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                                     if let Some(dec) = base64_decode(enc) {
                                         let streams = active.lock().await;
                                         let sid = p.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+                                        // Unknown sid: the stream ended on our side before the
+                                        // backend learned about it. Drop — sending to an
+                                        // arbitrary other stream would corrupt its traffic.
                                         if let Some(s) = streams.get(sid) {
                                             let _ = s.send(dec);
-                                        } else {
-                                            for (_, s) in streams.iter() {
-                                                let _ = s.send(dec.clone());
-                                                break;
-                                            }
                                         }
                                     }
                                 }
