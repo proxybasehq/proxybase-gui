@@ -30,6 +30,7 @@ const ja: Messages = {
   "nav.seller": "販売者",
   "nav.faq": "FAQ",
   "nav.login": "ログイン",
+  "nav.wallet": "ウォレット",
   "nav.settings": "設定",
   "nav.account": "アカウント",
   "nav.discord": "Discord",
@@ -68,6 +69,7 @@ const ja: Messages = {
   "login.desc":
     "ウォレットで認証して ProxyBase ネットワークにアクセスします。",
   "login.noWallet": "ウォレットが見つかりません",
+  "login.goToWallet": "ウォレットへ",
   "login.noWalletDesc":
     "まずウォレットページでウォレットを作成またはインポートしてください。",
   "login.authenticate": "認証",

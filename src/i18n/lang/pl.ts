@@ -30,6 +30,7 @@ const pl: Messages = {
   "nav.seller": "Sprzedawca",
   "nav.faq": "FAQ",
   "nav.login": "Zaloguj się",
+  "nav.wallet": "Portfel",
   "nav.settings": "Ustawienia",
   "nav.account": "Konto",
   "nav.discord": "Discord",
@@ -68,6 +69,7 @@ const pl: Messages = {
   "login.desc":
     "Uwierzytelnij się portfelem, aby uzyskać dostęp do sieci ProxyBase.",
   "login.noWallet": "Nie znaleziono portfela",
+  "login.goToWallet": "Przejdź do portfela",
   "login.noWalletDesc":
     "Najpierw utwórz lub zaimportuj portfel na stronie Portfel.",
   "login.authenticate": "Uwierzytelnij",

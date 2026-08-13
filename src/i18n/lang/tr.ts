@@ -30,6 +30,7 @@ const tr: Messages = {
   "nav.seller": "Satıcı",
   "nav.faq": "SSS",
   "nav.login": "Giriş yap",
+  "nav.wallet": "Cüzdan",
   "nav.settings": "Ayarlar",
   "nav.account": "Hesap",
   "nav.discord": "Discord",
@@ -68,6 +69,7 @@ const tr: Messages = {
   "login.desc":
     "ProxyBase ağına erişmek için cüzdanınızla doğrulama yapın.",
   "login.noWallet": "Cüzdan bulunamadı",
+  "login.goToWallet": "Cüzdana Git",
   "login.noWalletDesc":
     "Önce Cüzdan sayfasından bir cüzdan oluşturun veya içe aktarın.",
   "login.authenticate": "Doğrula",

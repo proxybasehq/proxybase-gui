@@ -30,6 +30,7 @@ const ar: Messages = {
   "nav.seller": "البائع",
   "nav.faq": "الأسئلة الشائعة",
   "nav.login": "تسجيل الدخول",
+  "nav.wallet": "المحفظة",
   "nav.settings": "الإعدادات",
   "nav.account": "الحساب",
   "nav.discord": "ديسكورد",
@@ -67,6 +68,7 @@ const ar: Messages = {
   "login.desc":
     "قم بالمصادقة باستخدام محفظتك للوصول إلى شبكة ProxyBase.",
   "login.noWallet": "لم يتم العثور على محفظة",
+  "login.goToWallet": "الانتقال إلى المحفظة",
   "login.noWalletDesc":
     "أنشئ أو استورد محفظة أولاً من صفحة المحفظة.",
   "login.authenticate": "مصادقة",

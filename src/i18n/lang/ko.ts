@@ -30,6 +30,7 @@ const ko: Messages = {
   "nav.seller": "판매자",
   "nav.faq": "FAQ",
   "nav.login": "로그인",
+  "nav.wallet": "지갑",
   "nav.settings": "설정",
   "nav.account": "계정",
   "nav.discord": "Discord",
@@ -67,6 +68,7 @@ const ko: Messages = {
   "login.desc":
     "ProxyBase 네트워크에 액세스하려면 지갑으로 인증하세요.",
   "login.noWallet": "지갑을 찾을 수 없음",
+  "login.goToWallet": "지갑으로 이동",
   "login.noWalletDesc": "지갑 페이지에서 먼저 지갑을 만들거나 가져오세요.",
   "login.authenticate": "인증",
   "login.walletAddress": "지갑 주소",

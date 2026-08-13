@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import { login, walletInfo } from "../api";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
@@ -11,6 +11,7 @@ import { useI18n } from "../i18n";
 
 export default function LoginPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { backendUrl } = useBackend();
   const { onLoginSuccess } = useOutletContext<AppContext>();
   const [password, setPassword] = useState("");
@@ -53,6 +54,10 @@ export default function LoginPage() {
         <div className="card">
           <div className="card-title">{t("login.noWallet")}</div>
           <p className="text-muted">{t("login.noWalletDesc")}</p>
+          <button className="btn btn-primary btn-sm" style={{ width: "100%", marginTop: "var(--space-sm)" }}
+            onClick={() => navigate("/wallet")}>
+            {t("login.goToWallet")}
+          </button>
         </div>
       ) : (
         <div className="card">

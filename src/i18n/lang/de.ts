@@ -30,6 +30,7 @@ const de: Messages = {
   "nav.seller": "Verkäufer",
   "nav.faq": "FAQ",
   "nav.login": "Anmelden",
+  "nav.wallet": "Wallet",
   "nav.settings": "Einstellungen",
   "nav.account": "Konto",
   "nav.discord": "Discord",
@@ -69,6 +70,7 @@ const de: Messages = {
   "login.desc":
     "Authentifiziere dich mit deinem Wallet, um auf das ProxyBase-Netzwerk zuzugreifen.",
   "login.noWallet": "Kein Wallet gefunden",
+  "login.goToWallet": "Zum Wallet",
   "login.noWalletDesc":
     "Erstelle oder importiere zuerst ein Wallet auf der Wallet-Seite.",
   "login.authenticate": "Authentifizieren",

@@ -30,6 +30,7 @@ const uk: Messages = {
   "nav.seller": "Продавець",
   "nav.faq": "FAQ",
   "nav.login": "Увійти",
+  "nav.wallet": "Гаманець",
   "nav.settings": "Налаштування",
   "nav.account": "Акаунт",
   "nav.discord": "Discord",
@@ -68,6 +69,7 @@ const uk: Messages = {
   "login.desc":
     "Авторизуйтеся за допомогою гаманця, щоб отримати доступ до мережі ProxyBase.",
   "login.noWallet": "Гаманець не знайдено",
+  "login.goToWallet": "Перейти до гаманця",
   "login.noWalletDesc":
     "Спочатку створіть або імпортуйте гаманець на сторінці «Гаманець».",
   "login.authenticate": "Авторизуватися",

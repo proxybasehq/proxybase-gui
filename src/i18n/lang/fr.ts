@@ -30,6 +30,7 @@ const fr: Messages = {
   "nav.seller": "Vendeur",
   "nav.faq": "FAQ",
   "nav.login": "Connexion",
+  "nav.wallet": "Portefeuille",
   "nav.settings": "Paramètres",
   "nav.account": "Compte",
   "nav.discord": "Discord",
@@ -69,6 +70,7 @@ const fr: Messages = {
   "login.desc":
     "Authentifiez-vous avec votre portefeuille pour accéder au réseau ProxyBase.",
   "login.noWallet": "Aucun portefeuille trouvé",
+  "login.goToWallet": "Aller au portefeuille",
   "login.noWalletDesc":
     "Créez ou importez d'abord un portefeuille depuis la page Portefeuille.",
   "login.authenticate": "S'authentifier",

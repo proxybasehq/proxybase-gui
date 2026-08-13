@@ -30,6 +30,7 @@ const pt: Messages = {
   "nav.seller": "Vendedor",
   "nav.faq": "FAQ",
   "nav.login": "Entrar",
+  "nav.wallet": "Carteira",
   "nav.settings": "Configurações",
   "nav.account": "Conta",
   "nav.discord": "Discord",
@@ -69,6 +70,7 @@ const pt: Messages = {
   "login.desc":
     "Autentique-se com sua carteira para acessar a rede ProxyBase.",
   "login.noWallet": "Nenhuma carteira encontrada",
+  "login.goToWallet": "Ir para a carteira",
   "login.noWalletDesc":
     "Crie ou importe uma carteira primeiro na página Carteira.",
   "login.authenticate": "Autenticar",

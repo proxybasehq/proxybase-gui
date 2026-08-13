@@ -30,6 +30,7 @@ const es: Messages = {
   "nav.seller": "Vendedor",
   "nav.faq": "FAQ",
   "nav.login": "Iniciar sesión",
+  "nav.wallet": "Cartera",
   "nav.settings": "Ajustes",
   "nav.account": "Cuenta",
   "nav.discord": "Discord",
@@ -69,6 +70,7 @@ const es: Messages = {
   "login.desc":
     "Autentícate con tu cartera para acceder a la red ProxyBase.",
   "login.noWallet": "No se encontró cartera",
+  "login.goToWallet": "Ir a la cartera",
   "login.noWalletDesc":
     "Crea o importa una cartera desde la página Cartera.",
   "login.authenticate": "Autenticar",

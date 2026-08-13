@@ -30,6 +30,7 @@ const ru: Messages = {
   "nav.seller": "Продавец",
   "nav.faq": "FAQ",
   "nav.login": "Войти",
+  "nav.wallet": "Кошелёк",
   "nav.settings": "Настройки",
   "nav.account": "Аккаунт",
   "nav.discord": "Discord",
@@ -69,6 +70,7 @@ const ru: Messages = {
   "login.desc":
     "Авторизуйтесь с помощью кошелька, чтобы получить доступ к сети ProxyBase.",
   "login.noWallet": "Кошелёк не найден",
+  "login.goToWallet": "Перейти к кошельку",
   "login.noWalletDesc":
     "Сначала создайте или импортируйте кошелёк на странице «Кошелёк».",
   "login.authenticate": "Авторизоваться",

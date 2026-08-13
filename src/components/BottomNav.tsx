@@ -10,6 +10,12 @@ export default function BottomNav({ authenticated, walletLoaded }: BottomNavProp
   const { t } = useI18n();
   const tabs: Array<{ to: string; label: string; icon: React.FC }> = [];
 
+  // Unauthenticated users always get the wallet tab — a user without a
+  // wallet must be able to reach the wallet page from anywhere.
+  if (!authenticated) {
+    tabs.push({ to: "/wallet", label: t("nav.wallet"), icon: WalletIcon });
+  }
+
   // Login only available when wallet exists but not authenticated
   if (!authenticated && walletLoaded) {
     tabs.push({ to: "/login", label: t("nav.login"), icon: KeyIcon });
@@ -37,6 +43,15 @@ export default function BottomNav({ authenticated, walletLoaded }: BottomNavProp
 }
 
 // ---- Inline SVG icons ----
+
+function WalletIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+      <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+    </svg>
+  );
+}
 
 function KeyIcon() {
   return (

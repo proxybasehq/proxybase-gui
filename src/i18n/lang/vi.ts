@@ -30,6 +30,7 @@ const vi: Messages = {
   "nav.seller": "Người bán",
   "nav.faq": "FAQ",
   "nav.login": "Đăng nhập",
+  "nav.wallet": "Ví",
   "nav.settings": "Cài đặt",
   "nav.account": "Tài khoản",
   "nav.discord": "Discord",
@@ -67,6 +68,7 @@ const vi: Messages = {
   "login.desc":
     "Xác thực bằng ví của bạn để truy cập mạng ProxyBase.",
   "login.noWallet": "Không tìm thấy ví",
+  "login.goToWallet": "Đến ví",
   "login.noWalletDesc": "Hãy tạo hoặc nhập ví trước từ trang Ví.",
   "login.authenticate": "Xác thực",
   "login.walletAddress": "Địa chỉ ví",

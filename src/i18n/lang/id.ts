@@ -30,6 +30,7 @@ const id: Messages = {
   "nav.seller": "Penjual",
   "nav.faq": "FAQ",
   "nav.login": "Masuk",
+  "nav.wallet": "Dompet",
   "nav.settings": "Pengaturan",
   "nav.account": "Akun",
   "nav.discord": "Discord",
@@ -68,6 +69,7 @@ const id: Messages = {
   "login.desc":
     "Autentikasi dengan dompet Anda untuk mengakses jaringan ProxyBase.",
   "login.noWallet": "Dompet Tidak Ditemukan",
+  "login.goToWallet": "Buka Dompet",
   "login.noWalletDesc": "Buat atau impor dompet terlebih dahulu dari halaman Dompet.",
   "login.authenticate": "Autentikasi",
   "login.walletAddress": "Alamat Dompet",
