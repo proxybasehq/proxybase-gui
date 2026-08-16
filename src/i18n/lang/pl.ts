@@ -154,6 +154,7 @@ const pl: Messages = {
   "seller.refreshStatus": "Odśwież status",
   "seller.startStop": "Uruchom / zatrzymaj sprzedawcę",
   "seller.includeDirect": "Uwzględnij połączenie bezpośrednie (sprzedawaj własną przepustowość)",
+  "seller.volunteerMode": "Tryb wolontariusza (przekaż przepustowość sieci bez wynagrodzenia)",
   "seller.upstreamProxies": "Proxy nadrzędne (odsprzedaż)",
   "seller.hostPort": "Host:Port",
   "seller.username": "Nazwa użytkownika",

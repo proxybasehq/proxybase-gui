@@ -154,6 +154,7 @@ const tr: Messages = {
   "seller.refreshStatus": "Durumu yenile",
   "seller.startStop": "Satıcıyı başlat / durdur",
   "seller.includeDirect": "Doğrudan dahil et (kendi bant genişliğini sat)",
+  "seller.volunteerMode": "Gönüllü modu (kazanç olmadan ağa bant genişliği bağışla)",
   "seller.upstreamProxies": "Üst akış proxy'leri (yeniden satış)",
   "seller.hostPort": "Sunucu:Port",
   "seller.username": "Kullanıcı adı",

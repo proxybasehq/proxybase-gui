@@ -236,11 +236,14 @@ impl BackendClient {
 
     // --- Seller ---
 
-    pub async fn register_seller(&self) -> Result<serde_json::Value> {
+    /// Register as a seller. `node_type` selects the compensation mode:
+    /// "standard" (default) or "volunteer" (donate bandwidth, no earnings).
+    pub async fn register_seller(&self, node_type: Option<&str>) -> Result<serde_json::Value> {
         let resp = self
             .http
             .post(format!("{}/v2/seller/register", self.base_url))
             .header("Authorization", self.bearer())
+            .json(&serde_json::json!({ "node_type": node_type.unwrap_or("standard") }))
             .send()
             .await
             .context("Failed to register seller")?;

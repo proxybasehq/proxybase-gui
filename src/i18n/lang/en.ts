@@ -154,6 +154,7 @@ const en = {
   "seller.refreshStatus": "Refresh Status",
   "seller.startStop": "Start / Stop Seller",
   "seller.includeDirect": "Include direct (sell own bandwidth)",
+  "seller.volunteerMode": "Volunteer Mode (donate bandwidth to the network without earnings)",
   "seller.upstreamProxies": "Upstream Proxies (resell)",
   "seller.hostPort": "Host:Port",
   "seller.username": "Username",

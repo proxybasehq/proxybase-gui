@@ -158,6 +158,7 @@ const es: Messages = {
   "seller.startStop": "Iniciar / detener vendedor",
   "seller.includeDirect":
     "Incluir conexión directa (vender tu propio ancho de banda)",
+  "seller.volunteerMode": "Modo voluntario (dona ancho de banda a la red sin ganancias)",
   "seller.upstreamProxies": "Proxies ascendentes (reventa)",
   "seller.hostPort": "Host:Puerto",
   "seller.username": "Usuario",

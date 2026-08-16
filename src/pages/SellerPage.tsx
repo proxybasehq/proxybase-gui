@@ -21,6 +21,7 @@ export default function SellerPage() {
   // Page-local config (only relevant when setting up seller)
   const [upstreams, setUpstreams] = useState<UpstreamProxy[]>([]);
   const [includeDirect, setIncludeDirect] = useState(true);
+  const [isVolunteer, setIsVolunteer] = useState(false);
   const [startError, setStartError] = useState("");
 
   async function handleStatus() {
@@ -38,7 +39,7 @@ export default function SellerPage() {
   async function handleStart() {
     setStartError("");
     try {
-      await startSeller(backendUrl, upstreams, includeDirect);
+      await startSeller(backendUrl, upstreams, includeDirect, isVolunteer);
     } catch (e) {
       setStartError(String(e));
     }
@@ -108,6 +109,18 @@ export default function SellerPage() {
               style={{ marginRight: 8 }}
             />
             {t("seller.includeDirect")}
+          </label>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">
+            <input
+              type="checkbox"
+              checked={isVolunteer}
+              onChange={(e) => setIsVolunteer(e.target.checked)}
+              style={{ marginRight: 8 }}
+            />
+            {t("seller.volunteerMode")}
           </label>
         </div>
 

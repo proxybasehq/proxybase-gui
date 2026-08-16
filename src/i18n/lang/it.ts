@@ -160,6 +160,7 @@ const it: Messages = {
   "seller.refreshStatus": "Aggiorna stato",
   "seller.startStop": "Avvia / ferma venditore",
   "seller.includeDirect": "Includi diretto (vendi la tua banda)",
+  "seller.volunteerMode": "Modalità volontario (dona larghezza di banda alla rete senza guadagni)",
   "seller.upstreamProxies": "Proxy a monte (rivendita)",
   "seller.hostPort": "Host:Porta",
   "seller.username": "Nome utente",

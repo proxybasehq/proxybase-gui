@@ -153,6 +153,7 @@ const ar: Messages = {
   "seller.refreshStatus": "تحديث الحالة",
   "seller.startStop": "بدء / إيقاف البائع",
   "seller.includeDirect": "تضمين الاتصال المباشر (بيع نطاقك الخاص)",
+  "seller.volunteerMode": "وضع التطوع (تبرع بالنطاق الترددي للشبكة بدون أرباح)",
   "seller.upstreamProxies": "البروكسيات الواردة (إعادة البيع)",
   "seller.hostPort": "المضيف:المنفذ",
   "seller.username": "اسم المستخدم",

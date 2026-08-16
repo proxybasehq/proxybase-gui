@@ -157,6 +157,7 @@ const pt: Messages = {
   "seller.refreshStatus": "Atualizar status",
   "seller.startStop": "Iniciar / parar vendedor",
   "seller.includeDirect": "Incluir direto (vender sua própria banda)",
+  "seller.volunteerMode": "Modo voluntário (doe largura de banda à rede sem ganhos)",
   "seller.upstreamProxies": "Proxies upstream (revenda)",
   "seller.hostPort": "Host:Porta",
   "seller.username": "Nome de usuário",

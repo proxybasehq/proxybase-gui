@@ -152,6 +152,7 @@ const vi: Messages = {
   "seller.refreshStatus": "Làm mới trạng thái",
   "seller.startStop": "Bắt đầu / dừng người bán",
   "seller.includeDirect": "Bao gồm trực tiếp (bán băng thông của bạn)",
+  "seller.volunteerMode": "Chế độ tình nguyện (quyên góp băng thông cho mạng lưới mà không nhận thu nhập)",
   "seller.upstreamProxies": "Proxy thượng nguồn (bán lại)",
   "seller.hostPort": "Máy chủ:Cổng",
   "seller.username": "Tên người dùng",

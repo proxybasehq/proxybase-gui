@@ -92,8 +92,11 @@ export async function getDeposit(
 
 // ---- Seller ----
 
-export async function registerSeller(backendUrl: string): Promise<Record<string, unknown>> {
-  return invoke("register_seller", { backendUrl });
+export async function registerSeller(
+  backendUrl: string,
+  nodeType?: string
+): Promise<Record<string, unknown>> {
+  return invoke("register_seller", { backendUrl, nodeType: nodeType ?? null });
 }
 
 export async function sellerStatus(backendUrl: string): Promise<Record<string, unknown>> {

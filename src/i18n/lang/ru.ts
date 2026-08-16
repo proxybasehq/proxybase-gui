@@ -160,6 +160,7 @@ const ru: Messages = {
   "seller.startStop": "Запустить / остановить продавца",
   "seller.includeDirect":
     "Включить прямое подключение (продавать собственную полосу)",
+  "seller.volunteerMode": "Режим волонтёра (пожертвовать пропускную способность сети без заработка)",
   "seller.upstreamProxies": "Вышестоящие прокси (перепродажа)",
   "seller.hostPort": "Хост:Порт",
   "seller.username": "Имя пользователя",

@@ -159,6 +159,7 @@ const de: Messages = {
   "seller.startStop": "Verkäufer starten / stoppen",
   "seller.includeDirect":
     "Direkt einbeziehen (eigene Bandbreite verkaufen)",
+  "seller.volunteerMode": "Freiwilligen-Modus (Bandbreite ohne Vergütung an das Netzwerk spenden)",
   "seller.upstreamProxies": "Upstream-Proxys (Weiterverkauf)",
   "seller.hostPort": "Host:Port",
   "seller.username": "Benutzername",

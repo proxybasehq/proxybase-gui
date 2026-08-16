@@ -158,6 +158,7 @@ const uk: Messages = {
   "seller.startStop": "Запустити / зупинити продавця",
   "seller.includeDirect":
     "Включити пряме підключення (продавати власну пропускну здатність)",
+  "seller.volunteerMode": "Режим волонтера (пожертвувати пропускну здатність мережі без заробітку)",
   "seller.upstreamProxies": "Вищестоящі проксі (перепродаж)",
   "seller.hostPort": "Хост:Порт",
   "seller.username": "Ім'я користувача",

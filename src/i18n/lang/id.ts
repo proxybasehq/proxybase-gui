@@ -153,6 +153,7 @@ const id: Messages = {
   "seller.refreshStatus": "Segarkan Status",
   "seller.startStop": "Mulai / Hentikan Penjual",
   "seller.includeDirect": "Sertakan langsung (jual bandwidth sendiri)",
+  "seller.volunteerMode": "Mode sukarelawan (donasikan bandwidth ke jaringan tanpa penghasilan)",
   "seller.upstreamProxies": "Proxy Hulu (jual ulang)",
   "seller.hostPort": "Host:Port",
   "seller.username": "Nama pengguna",

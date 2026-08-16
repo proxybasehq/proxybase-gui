@@ -318,8 +318,11 @@ pub async fn list_deposits(backend_url: String) -> Result<serde_json::Value, Str
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn register_seller(backend_url: String) -> Result<serde_json::Value, String> {
-    call_api!(&backend_url, client, client.register_seller())
+pub async fn register_seller(
+    backend_url: String,
+    node_type: Option<String>,
+) -> Result<serde_json::Value, String> {
+    call_api!(&backend_url, client, client.register_seller(node_type.as_deref()))
 }
 
 #[tauri::command]

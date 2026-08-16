@@ -152,6 +152,7 @@ const ko: Messages = {
   "seller.refreshStatus": "상태 새로고침",
   "seller.startStop": "판매자 시작 / 중지",
   "seller.includeDirect": "직접 연결 포함(자체 대역폭 판매)",
+  "seller.volunteerMode": "자원봉사 모드(수익 없이 네트워크에 대역폭 기부)",
   "seller.upstreamProxies": "업스트림 프록시(재판매)",
   "seller.hostPort": "호스트:포트",
   "seller.username": "사용자 이름",

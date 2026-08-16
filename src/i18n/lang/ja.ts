@@ -154,6 +154,7 @@ const ja: Messages = {
   "seller.refreshStatus": "状態を更新",
   "seller.startStop": "販売者の開始 / 停止",
   "seller.includeDirect": "直接接続を含める（自分の帯域幅を販売）",
+  "seller.volunteerMode": "ボランティアモード（報酬なしで帯域幅をネットワークに提供）",
   "seller.upstreamProxies": "アップストリームプロキシ（再販）",
   "seller.hostPort": "ホスト:ポート",
   "seller.username": "ユーザー名",

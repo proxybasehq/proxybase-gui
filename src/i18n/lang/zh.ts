@@ -146,6 +146,7 @@ const zh: Messages = {
   "seller.refreshStatus": "刷新状态",
   "seller.startStop": "启动 / 停止卖家",
   "seller.includeDirect": "包含直连（出售自己的带宽）",
+  "seller.volunteerMode": "志愿模式（无偿向网络捐赠带宽）",
   "seller.upstreamProxies": "上游代理（转售）",
   "seller.hostPort": "主机:端口",
   "seller.username": "用户名",

@@ -159,6 +159,7 @@ const fr: Messages = {
   "seller.startStop": "Démarrer / arrêter le vendeur",
   "seller.includeDirect":
     "Inclure la connexion directe (vendre votre propre bande passante)",
+  "seller.volunteerMode": "Mode bénévole (donnez de la bande passante au réseau sans gains)",
   "seller.upstreamProxies": "Proxys amont (revente)",
   "seller.hostPort": "Hôte:Port",
   "seller.username": "Nom d'utilisateur",

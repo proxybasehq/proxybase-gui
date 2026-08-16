@@ -36,7 +36,7 @@ export interface AppContext {
   onLoginSuccess: () => void;
   isAuthenticated: boolean;
   seller: SellerState;
-  startSeller: (backendUrl: string, upstreams: UpstreamProxy[], includeDirect: boolean) => Promise<void>;
+  startSeller: (backendUrl: string, upstreams: UpstreamProxy[], includeDirect: boolean, isVolunteer: boolean) => Promise<void>;
   stopSeller: () => Promise<void>;
   openDeposit: () => void;
   handleLogout: () => Promise<void>;
@@ -160,15 +160,15 @@ export default function Layout() {
     return () => { unlistens.forEach((fn) => fn()); };
   }, []);
 
-  async function handleStartSeller(beUrl: string, upstreams: UpstreamProxy[], includeDirect: boolean) {
+  async function handleStartSeller(beUrl: string, upstreams: UpstreamProxy[], includeDirect: boolean, isVolunteer: boolean) {
     setSellerError(""); setSellerStreams([]);
-    await registerSeller(beUrl);
+    await registerSeller(beUrl, isVolunteer ? "volunteer" : "standard");
     await apiStartSeller(beUrl, upstreams, includeDirect);
     setSellerRunning(true);
-    track(TrackEvent.SELLER_START, { upstreams: upstreams.length, includeDirect });
+    track(TrackEvent.SELLER_START, { upstreams: upstreams.length, includeDirect, volunteer: isVolunteer });
     try {
       const store = await load("proxybase-settings.json");
-      await store.set("seller_config", { upstreams, includeDirect });
+      await store.set("seller_config", { upstreams, includeDirect, volunteer: isVolunteer });
       await store.set("seller_running", true);
       await store.save();
     } catch (_) { /* ignore */ }
@@ -242,9 +242,9 @@ export default function Layout() {
     load("proxybase-settings.json").then(async (store) => {
       const wasRunning = await store.get<boolean>("seller_running");
       if (!wasRunning) return;
-      const cfg = await store.get<{ upstreams: UpstreamProxy[]; includeDirect: boolean }>("seller_config");
+      const cfg = await store.get<{ upstreams: UpstreamProxy[]; includeDirect: boolean; volunteer?: boolean }>("seller_config");
       if (!cfg) return;
-      handleStartSeller(backendUrl, cfg.upstreams || [], cfg.includeDirect ?? true);
+      handleStartSeller(backendUrl, cfg.upstreams || [], cfg.includeDirect ?? true, cfg.volunteer ?? false);
     }).catch(() => {});
   }, [isAuth]);
 
