@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useOutletContext, Navigate } from "react-router-dom";
 import { listPricing, createSession, closeSession, listSessions, keepaliveSession, getToken, bridgeStart, bridgeStop, bridgePort } from "../api";
 import { load } from "@tauri-apps/plugin-store";
@@ -245,7 +245,15 @@ export default function MarketPage() {
   }
 
 
-  const availablePrices = allPricing.filter((p) => ((p as any).available_sellers ?? 0) > 0);
+  const availablePrices = useMemo(() => {
+    return allPricing
+      .filter((p) => ((p as any).available_sellers ?? 0) > 0)
+      .sort((a, b) => {
+        const ka = `${(a as any).country}:${(a as any).network_type}`;
+        const kb = `${(b as any).country}:${(b as any).network_type}`;
+        return ka < kb ? -1 : ka > kb ? 1 : 0;
+      });
+  }, [allPricing]);
 
   useEffect(() => { fetchToken(); }, []);
   useEffect(() => {
