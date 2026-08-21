@@ -145,6 +145,11 @@ const ar: Messages = {
   "market.noActiveSessions":
     "لا توجد جلسات نشطة. اشترِ واحدة من تبويب الأسعار.",
   "market.mode": "الوضع",
+  "market.sessionType": "نوع الجلسة",
+  "market.rotating": "متغير",
+  "market.sticky": "ثابت (10د)",
+  "market.rotatingDesc": "عنوان IP جديد لكل طلب",
+  "market.stickyDesc": "نفس عنوان IP حتى 10 دقائق",
   "market.closeSession": "إغلاق الجلسة",
 
   "seller.title": "البائع",

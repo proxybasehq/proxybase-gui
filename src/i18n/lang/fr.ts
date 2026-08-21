@@ -149,6 +149,11 @@ const fr: Messages = {
   "market.noActiveSessions":
     "Aucune session active. Achetez-en une dans l'onglet Tarifs.",
   "market.mode": "Mode",
+  "market.sessionType": "Type de session",
+  "market.rotating": "Rotatif",
+  "market.sticky": "Fixe (10m)",
+  "market.rotatingDesc": "Nouvelle IP par requête",
+  "market.stickyDesc": "Même IP jusqu'à 10 min",
   "market.closeSession": "Fermer la session",
 
   "seller.title": "Vendeur",

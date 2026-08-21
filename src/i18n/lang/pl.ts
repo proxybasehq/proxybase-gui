@@ -146,6 +146,11 @@ const pl: Messages = {
   "market.noActiveSessions":
     "Brak aktywnych sesji. Kup jedną w zakładce Ceny.",
   "market.mode": "Tryb",
+  "market.sessionType": "Typ sesji",
+  "market.rotating": "Rotacyjny",
+  "market.sticky": "Statyczny (10m)",
+  "market.rotatingDesc": "Nowe IP na każde zapytanie",
+  "market.stickyDesc": "To samo IP do 10 minut",
   "market.closeSession": "Zamknij sesję",
 
   "seller.title": "Sprzedawca",

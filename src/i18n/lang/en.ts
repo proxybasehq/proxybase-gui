@@ -145,6 +145,11 @@ const en = {
   "market.activeSessionsCount": "Active Sessions ({count})",
   "market.noActiveSessions": "No active sessions. Buy one from the Prices tab.",
   "market.mode": "Mode",
+  "market.sessionType": "Session Type",
+  "market.rotating": "Rotating",
+  "market.sticky": "Sticky (10m)",
+  "market.rotatingDesc": "Fresh IP per request",
+  "market.stickyDesc": "Same IP for up to 10 min",
   "market.closeSession": "Close session",
 
   // Seller

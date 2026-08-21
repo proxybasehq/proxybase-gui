@@ -144,6 +144,11 @@ const vi: Messages = {
   "market.noActiveSessions":
     "Không có phiên hoạt động. Hãy mua một phiên trong tab Giá.",
   "market.mode": "Chế độ",
+  "market.sessionType": "Loại phiên",
+  "market.rotating": "Xoay vòng",
+  "market.sticky": "Cố định (10p)",
+  "market.rotatingDesc": "IP mới cho mỗi yêu cầu",
+  "market.stickyDesc": "Giữ nguyên IP tối đa 10 phút",
   "market.closeSession": "Đóng phiên",
 
   "seller.title": "Người bán",

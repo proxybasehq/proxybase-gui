@@ -144,6 +144,11 @@ const ko: Messages = {
   "market.noActiveSessions":
     "활성 세션이 없습니다. 가격 탭에서 구매하세요.",
   "market.mode": "모드",
+  "market.sessionType": "세션 유형",
+  "market.rotating": "로테이팅",
+  "market.sticky": "스티키 (10분)",
+  "market.rotatingDesc": "요청마다 새로운 IP",
+  "market.stickyDesc": "최대 10분간 동일한 IP 유지",
   "market.closeSession": "세션 닫기",
 
   "seller.title": "판매자",

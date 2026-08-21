@@ -16,6 +16,7 @@ export default function MarketPage() {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const [activeTab, setActiveTab] = useState<"prices" | "sessions">("prices");
+  const [sessionType, setSessionType] = useState<"rotating" | "sticky">("rotating");
   const [error, setError] = useState("");
   const [insufficientFunds, setInsufficientFunds] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -210,8 +211,8 @@ export default function MarketPage() {
     const countryTypeKey = `${country}:${networkType}`;
     setPriceBuyLoading(countryTypeKey);
     try {
-      const session = await createSession(backendUrl, country, networkType, "rotating", null);
-      track(TrackEvent.SESSION_CREATE, { country, networkType });
+      const session = await createSession(backendUrl, country, networkType, sessionType, null);
+      track(TrackEvent.SESSION_CREATE, { country, networkType, sessionType });
       const sid = (session as any).session_id;
       if (sid && token) {
         try {
@@ -440,6 +441,7 @@ export default function MarketPage() {
                     {copyTr({ label: t("market.password"), value: token.slice(0, 20) + "...", full: token })}
                     {copyTr({ label: t("market.country"), value: (connectModal as any).country })}
                     {copyTr({ label: t("market.type"), value: (connectModal as any).network_type || (connectModal as any).proxy_category })}
+                    {copyTr({ label: t("market.mode"), value: (connectModal as any).session_type || "rotating" })}
                   </tbody>
                 </table>
                 <div className="form-label" style={{ marginTop: "var(--space-md)" }}>{t("market.exampleCurl")}</div>
@@ -460,6 +462,7 @@ export default function MarketPage() {
                   <tbody>
                     {copyTr({ label: t("market.proxyAddress"), value: "127.0.0.1:" + (bridgePorts[(connectModal as any).session_id] || "?") })}
                     {copyTr({ label: t("market.auth"), value: t("market.noneRequired") })}
+                    {copyTr({ label: t("market.mode"), value: (connectModal as any).session_type || "rotating" })}
                   </tbody>
                 </table>
                 {bridgePorts[(connectModal as any).session_id] ? (
@@ -490,6 +493,56 @@ export default function MarketPage() {
           <div className="flex justify-between items-center">
             <div className="card-title" style={{ marginBottom: 0 }}>{t("market.pricing")}</div>
             <button className="btn btn-sm btn-secondary" onClick={fetchPrices} disabled={pricesLoading}>{t("market.refresh")}</button>
+          </div>
+
+          {/* Session Mode Selector */}
+          <div style={{ marginTop: "var(--space-sm)", marginBottom: "var(--space-xs)", padding: "var(--space-xs) var(--space-sm)", background: "var(--color-canvas-soft)", border: "1px solid var(--color-hairline)", borderRadius: "var(--rounded-md)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-sm)" }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-ink)" }}>{t("market.sessionType")}</div>
+                <div style={{ fontSize: 11, color: "var(--color-mute)", marginTop: 1 }}>
+                  {sessionType === "rotating" ? t("market.rotatingDesc") : t("market.stickyDesc")}
+                </div>
+              </div>
+              <div style={{ display: "inline-flex", background: "var(--color-canvas-soft-2)", padding: "2px", borderRadius: "var(--rounded-md)", border: "1px solid var(--color-hairline)", flexShrink: 0 }}>
+                <button
+                  type="button"
+                  style={{
+                    padding: "3px 10px",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    borderRadius: "var(--rounded-sm)",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    background: sessionType === "rotating" ? "var(--color-canvas)" : "transparent",
+                    boxShadow: sessionType === "rotating" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                    color: sessionType === "rotating" ? "var(--color-ink)" : "var(--color-mute)"
+                  }}
+                  onClick={() => setSessionType("rotating")}
+                >
+                  {t("market.rotating")}
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    padding: "3px 10px",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    borderRadius: "var(--rounded-sm)",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    background: sessionType === "sticky" ? "var(--color-canvas)" : "transparent",
+                    boxShadow: sessionType === "sticky" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                    color: sessionType === "sticky" ? "var(--color-ink)" : "var(--color-mute)"
+                  }}
+                  onClick={() => setSessionType("sticky")}
+                >
+                  {t("market.sticky")}
+                </button>
+              </div>
+            </div>
           </div>
           {pricesLoading && allPricing.length === 0 ? (
             <div style={{ textAlign: "center", padding: "var(--space-xl) 0" }}>

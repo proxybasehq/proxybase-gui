@@ -149,6 +149,11 @@ const pt: Messages = {
   "market.noActiveSessions":
     "Nenhuma sessão ativa. Compre uma na aba Preços.",
   "market.mode": "Modo",
+  "market.sessionType": "Tipo de sessão",
+  "market.rotating": "Rotativo",
+  "market.sticky": "Persistente (10m)",
+  "market.rotatingDesc": "Novo IP por requisição",
+  "market.stickyDesc": "Mesmo IP por até 10 min",
   "market.closeSession": "Fechar sessão",
 
   "seller.title": "Vendedor",

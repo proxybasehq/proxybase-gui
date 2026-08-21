@@ -145,6 +145,11 @@ const id: Messages = {
   "market.noActiveSessions":
     "Tidak ada sesi aktif. Beli satu dari tab Harga.",
   "market.mode": "Mode",
+  "market.sessionType": "Tipe Sesi",
+  "market.rotating": "Bergilir",
+  "market.sticky": "Tetap (10m)",
+  "market.rotatingDesc": "IP baru per permintaan",
+  "market.stickyDesc": "IP yang sama hingga 10 menit",
   "market.closeSession": "Tutup sesi",
 
   "seller.title": "Penjual",

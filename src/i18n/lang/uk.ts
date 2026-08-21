@@ -148,6 +148,11 @@ const uk: Messages = {
   "market.noActiveSessions":
     "Немає активних сесій. Купіть одну у вкладці «Ціни».",
   "market.mode": "Режим",
+  "market.sessionType": "Тип сесії",
+  "market.rotating": "Ротаційний",
+  "market.sticky": "Статичний (10хв)",
+  "market.rotatingDesc": "Новий IP на кожен запит",
+  "market.stickyDesc": "Той самий IP до 10 хвилин",
   "market.closeSession": "Закрити сесію",
 
   "seller.title": "Продавець",

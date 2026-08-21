@@ -146,6 +146,11 @@ const tr: Messages = {
   "market.noActiveSessions":
     "Aktif oturum yok. Fiyatlar sekmesinden bir tane satın alın.",
   "market.mode": "Mod",
+  "market.sessionType": "Oturum Türü",
+  "market.rotating": "Dönen (Rotating)",
+  "market.sticky": "Sabit (10dk)",
+  "market.rotatingDesc": "Her istekte yeni IP",
+  "market.stickyDesc": "10 dakikaya kadar aynı IP",
   "market.closeSession": "Oturumu kapat",
 
   "seller.title": "Satıcı",

@@ -150,6 +150,11 @@ const ru: Messages = {
   "market.noActiveSessions":
     "Нет активных сессий. Купите одну во вкладке «Цены».",
   "market.mode": "Режим",
+  "market.sessionType": "Тип сессии",
+  "market.rotating": "Ротируемый",
+  "market.sticky": "Статичный (10м)",
+  "market.rotatingDesc": "Новый IP на каждый запрос",
+  "market.stickyDesc": "Один IP до 10 минут",
   "market.closeSession": "Закрыть сессию",
 
   "seller.title": "Продавец",

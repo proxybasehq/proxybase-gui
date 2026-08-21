@@ -146,6 +146,11 @@ const ja: Messages = {
   "market.noActiveSessions":
     "アクティブなセッションはありません。「価格」タブから購入してください。",
   "market.mode": "モード",
+  "market.sessionType": "セッションタイプ",
+  "market.rotating": "ローテーション",
+  "market.sticky": "スティッキー (10分)",
+  "market.rotatingDesc": "リクエストごとに新規IP",
+  "market.stickyDesc": "最大10分間同一IPを維持",
   "market.closeSession": "セッションを閉じる",
 
   "seller.title": "販売者",

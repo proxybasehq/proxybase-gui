@@ -138,6 +138,11 @@ const zh: Messages = {
   "market.activeSessionsCount": "活跃会话（{count}）",
   "market.noActiveSessions": "没有活跃会话。请到价格标签页购买一个。",
   "market.mode": "模式",
+  "market.sessionType": "会话类型",
+  "market.rotating": "轮换",
+  "market.sticky": "粘性 (10分钟)",
+  "market.rotatingDesc": "每个请求更换新IP",
+  "market.stickyDesc": "保持同一IP最长10分钟",
   "market.closeSession": "关闭会话",
 
   "seller.title": "卖家",

@@ -149,6 +149,11 @@ const es: Messages = {
   "market.noActiveSessions":
     "No hay sesiones activas. Compra una en la pestaña Precios.",
   "market.mode": "Modo",
+  "market.sessionType": "Tipo de sesión",
+  "market.rotating": "Rotativo",
+  "market.sticky": "Persistente (10m)",
+  "market.rotatingDesc": "IP nueva por solicitud",
+  "market.stickyDesc": "Misma IP hasta 10 min",
   "market.closeSession": "Cerrar sesión",
 
   "seller.title": "Vendedor",
