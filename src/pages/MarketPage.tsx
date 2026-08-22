@@ -9,6 +9,40 @@ import { CountryFlag } from "../components/CountryFlag";
 import { track, TrackEvent } from "../tracking";
 import { useI18n } from "../i18n";
 
+// View-only mappings: system types stay untouched, only the rendered text
+// changes. All glyphs are Emoji 0.6 (Unicode 6.0) so they render on every
+// desktop OS and Android WebView.
+const EMOJI_FONT = "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+const TYPE_EMOJI: Record<string, string> = {
+  burner: "🔥",
+  mobile: "📱",
+  datacenter: "🏢",
+  residential: "🏠",
+  isp: "🌐",
+};
+const MODE_EMOJI: Record<string, string> = {
+  rotating: "🔄",
+  sticky: "📌",
+};
+const STATUS_EMOJI: Record<string, string> = {
+  active: "✅",
+  alive: "✅",
+  open: "⏳",
+  closed: "❌",
+  failed: "⚠️",
+};
+
+function emojiBadge(map: Record<string, string>, value: unknown) {
+  const raw = String(value ?? "-");
+  const emoji = map[raw];
+  if (!emoji) return <span className="badge">{raw}</span>;
+  return (
+    <span className="badge" title={raw} style={{ fontFamily: EMOJI_FONT }}>
+      {emoji}
+    </span>
+  );
+}
+
 export default function MarketPage() {
   const { t } = useI18n();
   const { backendUrl } = useBackend();
@@ -64,15 +98,21 @@ export default function MarketPage() {
   const nextPortRef = useRef(10800);
   const [token, setToken] = useState("");
 
-  async function fetchPrices() {
-    setError("");
+  const pricesInFlightRef = useRef(false);
+  async function fetchPrices(silent = false) {
+    if (pricesInFlightRef.current) return; // never stack requests
+    pricesInFlightRef.current = true;
+    if (!silent) setError("");
     setPricesLoading(true);
-    fetchSessions(); // refresh sessions in background
     try {
       const r = await listPricing(backendUrl);
       setAllPricing(((r as any).pricing || []));
-    } catch (e) { setError(String(e)); }
-    setPricesLoading(false);
+    } catch (e) {
+      if (!silent) setError(String(e));
+    } finally {
+      setPricesLoading(false);
+      pricesInFlightRef.current = false;
+    }
   }
 
   async function saveBridgePorts(ports: Record<string, number>) {
@@ -117,6 +157,27 @@ export default function MarketPage() {
       return null;
     }
   }
+
+  // ── Auto-refresh pricing + sessions every minute ──
+  // Skips a tick while the previous fetch is still in flight and fails
+  // silently.
+  const sessionsRefreshInFlightRef = useRef(false);
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      fetchPrices(true); // self-guarding, silent
+      if (!sessionsRefreshInFlightRef.current) {
+        sessionsRefreshInFlightRef.current = true;
+        try {
+          await fetchSessions();
+        } catch (_) {
+          /* fetchSessions never throws; silence is a safety net */
+        } finally {
+          sessionsRefreshInFlightRef.current = false;
+        }
+      }
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [backendUrl]);
 
   // ── Session keepalive timer (every 5 minutes) ──
   useEffect(() => {
@@ -317,7 +378,7 @@ export default function MarketPage() {
               const now = Date.now();
               if (now - lastPriceFetch > 10_000) {
                 lastPriceFetch = now;
-                fetchPrices();
+                fetchPrices(true);
               }
             }
             if (evt.event === "SessionUpdate") {
@@ -490,11 +551,6 @@ export default function MarketPage() {
       {/* ---- Prices Tab ---- */}
       {activeTab === "prices" && (
         <div className="card">
-          <div className="flex justify-between items-center">
-            <div className="card-title" style={{ marginBottom: 0 }}>{t("market.pricing")}</div>
-            <button className="btn btn-sm btn-secondary" onClick={fetchPrices} disabled={pricesLoading}>{t("market.refresh")}</button>
-          </div>
-
           {/* Session Mode Selector */}
           <div style={{ marginTop: "var(--space-sm)", marginBottom: "var(--space-xs)", padding: "var(--space-xs) var(--space-sm)", background: "var(--color-canvas-soft)", border: "1px solid var(--color-hairline)", borderRadius: "var(--rounded-md)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-sm)" }}>
@@ -552,7 +608,7 @@ export default function MarketPage() {
           ) : availablePrices.length > 0 ? (
             <div className="table-container" style={{ marginTop: "var(--space-sm)" }}>
               <table>
-                <thead><tr><th>{t("market.country")}</th><th>{t("market.category")}</th><th>{t("market.price")}</th><th style={{ width: 80 }}></th></tr></thead>
+                <thead><tr><th>{t("market.country")}</th><th>{t("market.type")}</th><th>{t("market.price")}</th><th style={{ width: 80 }}></th></tr></thead>
                 <tbody>
                   {availablePrices.map((p, i) => {
                     const c = (p as any).country as string;
@@ -565,7 +621,7 @@ export default function MarketPage() {
                         <CountryFlag code={c} />
                         <span style={{ fontSize: 12 }}>{c}</span>
                       </td>
-                      <td><span className="badge">{nt}</span></td>
+                      <td>{emojiBadge(TYPE_EMOJI, nt)}</td>
                       <td className="font-mono">{formatUsdPerGb((p as any).buyer_price_microcredits_per_gb)}</td>
                       <td>
                         <button
@@ -591,10 +647,7 @@ export default function MarketPage() {
       {/* ---- Active Sessions Tab ---- */}
       {activeTab === "sessions" && (
         <div className="card">
-          <div className="flex justify-between items-center">
-            <div className="card-title" style={{ marginBottom: 0 }}>{t("market.activeSessionsCount", { count: sessions.length })}</div>
-            <button className="btn btn-sm btn-secondary" onClick={() => fetchSessions()}>{t("market.refresh")}</button>
-          </div>
+          <div className="card-title" style={{ marginBottom: 0 }}>{t("market.activeSessionsCount", { count: sessions.length })}</div>
           {sessions.length === 0 ? (
             <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{t("market.noActiveSessions")}</p>
           ) : (
@@ -616,9 +669,9 @@ export default function MarketPage() {
                         <CountryFlag code={(s as any).country} />
                         <span style={{ fontSize: 12 }}>{(s as any).country}</span>
                       </td>
-                      <td><span className="badge">{(s as any).network_type || (s as any).proxy_category || "-"}</span></td>
-                      <td><span className="badge">{(s as any).session_type || "-"}</span></td>
-                      <td><span className={`badge ${(s as any).status === "active" ? "badge-success" : ""}`}>{(s as any).status || "-"}</span></td>
+                      <td>{emojiBadge(TYPE_EMOJI, (s as any).network_type || (s as any).proxy_category)}</td>
+                      <td>{emojiBadge(MODE_EMOJI, (s as any).session_type)}</td>
+                      <td>{emojiBadge(STATUS_EMOJI, (s as any).status)}</td>
                       <td className="table-action" onClick={(e) => e.stopPropagation()}>
                         <button className="btn btn-sm btn-danger" style={{ padding: "0 6px", height: 26, fontSize: 11 }}
                           onClick={() => handleClose((s as any).session_id)}
