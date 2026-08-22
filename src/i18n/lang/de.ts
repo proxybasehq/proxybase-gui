@@ -257,13 +257,13 @@ const de: Messages = {
     "Gehe zum Tab Verkäufer, konfiguriere optional deine Upstream-Proxys und klicke auf „Verkäufer starten'. Dein Knoten registriert sich beim Marktplatz und erhält QoS-Sonden. Nach bestandenen Qualitätsprüfungen wird deine Verbindung nach Land und Netzwerktyp klassifiziert und steht Käufern zum Kauf zur Verfügung. Du verdienst Credits für jeden GB übertragenen Datenverkehrs.",
   "faq.q3": "Welche Netzwerktypen gibt es?",
   "faq.a3":
-    "ProxyBase klassifiziert Verkäuferverbindungen in fünf Typen: Residential (Heim-ISP), Mobile (Mobilfunk), Datacenter (Cloud-/Colo-IPs), ISP (Geschäfts-/statische IPs) und Burner (VPN/Tor/Proxy-IPs). Burner-IPs werden bei QoS-Sonden markiert und können niedrigere Preise erhalten oder für bestimmte Käufergruppen gesperrt werden.",
+    "ProxyBase klassifiziert Verkäuferverbindungen in fünf Typen: 🏠 Residential (Heim-ISP), 📱 Mobile (Mobilfunk), 🏢 Datacenter (Cloud-/Colo-IPs), 🌐 ISP (Geschäfts-/statische IPs) und 🚩 Burner (VPN/Tor/Proxy-IPs). Burner-IPs werden bei QoS-Sonden markiert und können niedrigere Preise erhalten oder für bestimmte Käufergruppen gesperrt werden.",
   "faq.q4": "Wie kaufe ich eine Proxy-Sitzung?",
   "faq.a4":
     "Gehe zum Tab Markt → Preise. Suche ein Land und einen Netzwerktyp mit verfügbaren Verkäufern und klicke auf den grünen „Kaufen'-Button in dieser Zeile. Eine SOCKS5-Proxy-Sitzung wird erstellt und erscheint unter dem Tab „Aktive Sitzungen'. Dein Wallet-Saldo wird pro GB genutztem Datenverkehr belastet. Schließe eine Sitzung jederzeit über das X in ihrer Zeile.",
   "faq.q5": "Wie funktionieren Microcredits und Preise?",
   "faq.a5":
-    "1.000.000 Microcredits = 1,00 USD. Die Preise werden pro Land und Netzwerktyp festgelegt (z. B. 0,50 $/GB für US-Residential). Verkäufer verdienen Credits, wenn Käufer ihre Proxys nutzen. Du kannst Guthaben mit Kryptowährungen (BTC, USDC, USDT, SOL usw.) über NOWPayments einzahlen.",
+    "1.000.000 Microcredits = 1,00 USD. Die Preise werden pro Land und Netzwerktyp festgelegt (z. B. 0,50 $/GB für US 🏠 Residential). Verkäufer verdienen Credits, wenn Käufer ihre Proxys nutzen. Du kannst Guthaben mit Kryptowährungen (BTC, USDC, USDT, SOL usw.) über NOWPayments einzahlen.",
   "faq.q6": "Was ist eine Einzahlung und wie erstelle ich eine?",
   "faq.a6":
     "Öffne die Kontoseite über das Symbol im Kopfbereich und tippe auf „Guthaben hinzufügen'. Wähle einen Betrag (10, 20, 100 $ oder frei) und eine Kryptowährung. Nach der Erstellung gelangst du zu einer Einzahlungsseite mit Zahlungsadresse, QR-Code und einem 9-Minuten-Countdown. Sende exakt den angezeigten Betrag an diese Adresse – dein Saldo aktualisiert sich nach der Bestätigung automatisch.",

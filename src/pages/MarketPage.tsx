@@ -14,7 +14,7 @@ import { useI18n } from "../i18n";
 // desktop OS and Android WebView.
 const EMOJI_FONT = "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
 const TYPE_EMOJI: Record<string, string> = {
-  burner: "🔥",
+  burner: "🚩",
   mobile: "📱",
   datacenter: "🏢",
   residential: "🏠",
@@ -478,9 +478,9 @@ export default function MarketPage() {
 
       {/* ---- Connect Modal ---- */}
       {connectModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", overflowY: "auto", zIndex: 1000 }}
           onClick={() => setConnectModal(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card" style={{ margin: "auto", maxHeight: "none", overflow: "visible" }} onClick={(e) => e.stopPropagation()}>
             <div className="card-title">{t("market.connectionDetails")}</div>
 
             <div className="tabs" style={{ marginTop: "var(--space-sm)" }}>

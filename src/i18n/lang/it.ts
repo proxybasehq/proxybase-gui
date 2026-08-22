@@ -258,13 +258,13 @@ const it: Messages = {
     "Vai alla scheda Venditore, configura i proxy a monte (facoltativi) e fai clic su 'Avvia venditore'. Il tuo nodo si registra sul marketplace e inizia a ricevere sonde QoS. Dopo aver superato i controlli di qualità, la tua connessione viene classificata per paese e tipo di rete e diventa acquistabile dagli acquirenti. Guadagni crediti per ogni GB di traffico inoltrato.",
   "faq.q3": "Quali sono i tipi di rete?",
   "faq.a3":
-    "ProxyBase classifica le connessioni dei venditori in cinque tipi: Residenziale (ISP domestico), Mobile (operatore cellulare), Datacenter (IP cloud/colo), ISP (IP aziendali/statiche) e Burner (IP VPN/tor/proxy). Le IP Burner vengono segnalate durante le sonde QoS e possono ricevere prezzi più bassi o essere limitate per alcuni gruppi di acquirenti.",
+    "ProxyBase classifica le connessioni dei venditori in cinque tipi: 🏠 Residenziale (ISP domestico), 📱 Mobile (operatore cellulare), 🏢 Datacenter (IP cloud/colo), 🌐 ISP (IP aziendali/statiche) e 🚩 Burner (IP VPN/tor/proxy). Le IP Burner vengono segnalate durante le sonde QoS e possono ricevere prezzi più bassi o essere limitate per alcuni gruppi di acquirenti.",
   "faq.q4": "Come acquisto una sessione proxy?",
   "faq.a4":
     "Vai alla scheda Mercato → Prezzi. Trova un paese e un tipo di rete con venditori disponibili, poi fai clic sul pulsante verde 'Acquista' di quella riga. Viene creata una sessione proxy SOCKS5 che appare sotto la scheda 'Sessioni attive'. Il tuo saldo viene addebitato per GB di traffico utilizzato. Chiudi una sessione in qualsiasi momento con il pulsante X della sua riga.",
   "faq.q5": "Come funzionano i microcrediti e i prezzi?",
   "faq.a5":
-    "1.000.000 di microcrediti = 1,00 USD. Il prezzo è fissato per paese e tipo di rete (es. 0,50 $/GB per residenziale USA). I venditori guadagnano crediti quando gli acquirenti usano i loro proxy. Puoi depositare fondi con criptovalute (BTC, USDC, USDT, SOL, ecc.) tramite NOWPayments.",
+    "1.000.000 di microcrediti = 1,00 USD. Il prezzo è fissato per paese e tipo di rete (es. 0,50 $/GB per 🏠 residenziale USA). I venditori guadagnano crediti quando gli acquirenti usano i loro proxy. Puoi depositare fondi con criptovalute (BTC, USDC, USDT, SOL, ecc.) tramite NOWPayments.",
   "faq.q6": "Cos'è un deposito e come ne creo uno?",
   "faq.a6":
     "Apri la pagina Account dall'icona nell'intestazione, poi tocca 'Aggiungi fondi'. Scegli un importo (10, 20, 100 $ o personalizzato) e una criptovaluta. Dopo la creazione, verrai portato a una pagina di deposito con l'indirizzo di pagamento, il codice QR e un conto alla rovescia di 9 minuti. Invia esattamente l'importo mostrato a quell'indirizzo: il tuo saldo si aggiorna automaticamente una volta confermato.",

@@ -249,13 +249,13 @@ const id: Messages = {
     "Buka tab Penjual, konfigurasikan proxy hulu (opsional), dan klik 'Mulai Penjual'. Node Anda akan mendaftar ke pasar dan mulai menerima probe QoS. Setelah lolos pemeriksaan kualitas, koneksi Anda diklasifikasikan berdasarkan negara dan tipe jaringan, lalu tersedia untuk dibeli pembeli. Anda mendapat kredit untuk setiap GB lalu lintas yang diteruskan.",
   "faq.q3": "Apa saja tipe jaringannya?",
   "faq.a3":
-    "ProxyBase mengklasifikasikan koneksi penjual menjadi lima tipe: Residensial (ISP rumah), Seluler (operator seluler), Pusat Data (IP cloud/colo), ISP (IP bisnis/statis), dan Burner (IP VPN/tor/proxy). IP Burner ditandai selama probing QoS dan dapat menerima harga lebih rendah atau dibatasi dari beberapa grup pembeli.",
+    "ProxyBase mengklasifikasikan koneksi penjual menjadi lima tipe: 🏠 Residensial (ISP rumah), 📱 Seluler (operator seluler), 🏢 Pusat Data (IP cloud/colo), 🌐 ISP (IP bisnis/statis), dan 🚩 Burner (IP VPN/tor/proxy). IP Burner ditandai selama probing QoS dan dapat menerima harga lebih rendah atau dibatasi dari beberapa grup pembeli.",
   "faq.q4": "Bagaimana cara membeli sesi proxy?",
   "faq.a4":
     "Buka tab Pasar → Harga. Temukan negara dan tipe jaringan dengan penjual tersedia, lalu klik tombol 'Beli' hijau pada baris tersebut. Sesi proxy SOCKS5 dibuat dan muncul di tab 'Sesi Aktif'. Saldo dompet Anda didebit per GB lalu lintas yang digunakan. Tutup sesi kapan saja dengan mengklik tombol X pada barisnya.",
   "faq.q5": "Bagaimana mikrokredit dan harga bekerja?",
   "faq.a5":
-    "1.000.000 mikrokredit = $1,00 USD. Harga ditetapkan per negara dan tipe jaringan (mis. $0,50/GB untuk residensial AS). Penjual mendapat kredit saat pembeli menggunakan proxy mereka. Anda dapat mendepositkan dana menggunakan mata uang kripto (BTC, USDC, USDT, SOL, dll.) melalui NOWPayments.",
+    "1.000.000 mikrokredit = $1,00 USD. Harga ditetapkan per negara dan tipe jaringan (mis. $0,50/GB untuk 🏠 residensial AS). Penjual mendapat kredit saat pembeli menggunakan proxy mereka. Anda dapat mendepositkan dana menggunakan mata uang kripto (BTC, USDC, USDT, SOL, dll.) melalui NOWPayments.",
   "faq.q6": "Apa itu deposit dan bagaimana cara membuatnya?",
   "faq.a6":
     "Buka halaman Akun dari ikon header, lalu ketuk 'Tambah Dana'. Pilih jumlah ($10, $20, $100, atau kustom) dan mata uang kripto. Setelah dibuat, Anda akan dibawa ke halaman deposit yang menampilkan alamat pembayaran, kode QR, dan hitung mundur 9 menit. Kirim jumlah persis yang ditampilkan ke alamat tersebut — saldo dompet Anda diperbarui otomatis setelah dikonfirmasi.",

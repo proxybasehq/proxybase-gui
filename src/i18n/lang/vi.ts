@@ -248,13 +248,13 @@ const vi: Messages = {
     "Đi tới tab Người bán, cấu hình proxy thượng nguồn (tùy chọn) và nhấp 'Bắt đầu người bán'. Nút của bạn sẽ đăng ký với chợ và bắt đầu nhận các kiểm tra QoS. Sau khi vượt qua kiểm tra chất lượng, kết nối của bạn được phân loại theo quốc gia và loại mạng, đồng thời có sẵn để người mua mua. Bạn kiếm được tín dụng cho mỗi GB lưu lượng chuyển tiếp.",
   "faq.q3": "Các loại mạng là gì?",
   "faq.a3":
-    "ProxyBase phân loại kết nối của người bán thành năm loại: Dân cư (ISP gia đình), Di động (nhà mạng di động), Trung tâm dữ liệu (IP đám mây/colo), ISP (IP doanh nghiệp/tĩnh) và Burner (IP VPN/tor/proxy). IP Burner được đánh dấu trong quá trình kiểm tra QoS và có thể nhận giá thấp hơn hoặc bị hạn chế ở một số nhóm người mua.",
+    "ProxyBase phân loại kết nối của người bán thành năm loại: 🏠 Dân cư (ISP gia đình), 📱 Di động (nhà mạng di động), 🏢 Trung tâm dữ liệu (IP đám mây/colo), 🌐 ISP (IP doanh nghiệp/tĩnh) và 🚩 Burner (IP VPN/tor/proxy). IP Burner được đánh dấu trong quá trình kiểm tra QoS và có thể nhận giá thấp hơn hoặc bị hạn chế ở một số nhóm người mua.",
   "faq.q4": "Làm thế nào để mua một phiên proxy?",
   "faq.a4":
     "Đi tới tab Chợ → Giá. Tìm quốc gia và loại mạng có người bán khả dụng, sau đó nhấp vào nút 'Mua' màu xanh lá ở hàng đó. Một phiên proxy SOCKS5 được tạo và xuất hiện trong tab 'Phiên hoạt động'. Số dư ví của bạn bị trừ theo mỗi GB lưu lượng sử dụng. Đóng phiên bất kỳ lúc nào bằng nút X trên hàng của nó.",
   "faq.q5": "Microcredit và giá cả hoạt động như thế nào?",
   "faq.a5":
-    "1.000.000 microcredit = 1,00 USD. Giá được đặt theo quốc gia và loại mạng (ví dụ: 0,50 USD/GB cho dân cư Mỹ). Người bán kiếm tín dụng khi người mua sử dụng proxy của họ. Bạn có thể nạp tiền bằng tiền điện tử (BTC, USDC, USDT, SOL, v.v.) qua NOWPayments.",
+    "1.000.000 microcredit = 1,00 USD. Giá được đặt theo quốc gia và loại mạng (ví dụ: 0,50 USD/GB cho 🏠 dân cư Mỹ). Người bán kiếm tín dụng khi người mua sử dụng proxy của họ. Bạn có thể nạp tiền bằng tiền điện tử (BTC, USDC, USDT, SOL, v.v.) qua NOWPayments.",
   "faq.q6": "Khoản nạp là gì và làm thế nào để tạo?",
   "faq.a6":
     "Mở trang Tài khoản từ biểu tượng tiêu đề, rồi chạm 'Thêm tiền'. Chọn số tiền (10, 20, 100 USD hoặc tùy chỉnh) và một loại tiền điện tử. Sau khi tạo, bạn sẽ đến trang nạp tiền hiển thị địa chỉ thanh toán, mã QR và đồng hồ đếm ngược 9 phút. Gửi chính xác số tiền hiển thị đến địa chỉ đó — số dư ví của bạn tự động cập nhật sau khi được xác nhận.",

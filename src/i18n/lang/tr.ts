@@ -250,13 +250,13 @@ const tr: Messages = {
     "Satıcı sekmesine gidin, üst akış proxy'lerinizi (isteğe bağlı) yapılandırın ve 'Satıcıyı başlat'a tıklayın. Düğümünüz pazara kaydolur ve QoS yoklamaları almaya başlar. Kalite kontrollerini geçtikten sonra bağlantınız ülke ve ağ türüne göre sınıflandırılır ve alıcıların satın alımına sunulur. Aktardığınız her GB trafik için kredi kazanırsınız.",
   "faq.q3": "Ağ türleri nelerdir?",
   "faq.a3":
-    "ProxyBase satıcı bağlantılarını beş türe ayırır: Konut (ev ISP'si), Mobil (hücresel operatör), Veri merkezi (bulut/colo IP'leri), ISP (iş/statik IP'ler) ve Burner (VPN/tor/proxy IP'leri). Burner IP'leri QoS yoklamaları sırasında işaretlenir ve daha düşük fiyat alabilir veya belirli alıcı havuzlarından kısıtlanabilir.",
+    "ProxyBase satıcı bağlantılarını beş türe ayırır: 🏠 Konut (ev ISP'si), 📱 Mobil (hücresel operatör), 🏢 Veri merkezi (bulut/colo IP'leri), 🌐 ISP (iş/statik IP'ler) ve 🚩 Burner (VPN/tor/proxy IP'leri). Burner IP'leri QoS yoklamaları sırasında işaretlenir ve daha düşük fiyat alabilir veya belirli alıcı havuzlarından kısıtlanabilir.",
   "faq.q4": "Bir proxy oturumunu nasıl satın alırım?",
   "faq.a4":
     "Pazar sekmesi → Fiyatlar'a gidin. Satıcısı olan bir ülke ve ağ türü bulun, ardından o satırdaki yeşil 'Satın al' düğmesine tıklayın. Bir SOCKS5 proxy oturumu oluşturulur ve 'Aktif oturumlar' sekmesi altında görünür. Kullanılan her GB trafik için cüzdan bakiyenizden düşülür. Bir oturumu istediğiniz zaman satırındaki X düğmesiyle kapatabilirsiniz.",
   "faq.q5": "Mikro krediler ve fiyatlandırma nasıl çalışır?",
   "faq.a5":
-    "1.000.000 mikro kredi = 1,00 ABD doları. Fiyat ülkeye ve ağ türüne göre belirlenir (ör. ABD konutu için 0,50 $/GB). Alıcılar proxy'lerini kullandığında satıcılar kredi kazanır. NOWPayments üzerinden kripto paralarla (BTC, USDC, USDT, SOL vb.) fon yatırabilirsiniz.",
+    "1.000.000 mikro kredi = 1,00 ABD doları. Fiyat ülkeye ve ağ türüne göre belirlenir (ör. ABD 🏠 konutu için 0,50 $/GB). Alıcılar proxy'lerini kullandığında satıcılar kredi kazanır. NOWPayments üzerinden kripto paralarla (BTC, USDC, USDT, SOL vb.) fon yatırabilirsiniz.",
   "faq.q6": "Yatırım nedir ve nasıl oluştururum?",
   "faq.a6":
     "Başlıktaki simgeden Hesap sayfasını açın ve 'Fon ekle'ye dokunun. Bir tutar (10, 20, 100 $ veya özel) ve bir kripto para seçin. Oluşturduktan sonra ödeme adresini, QR kodunu ve 9 dakikalık geri sayımı gösteren bir yatırım sayfasına gidersiniz. Bu adrese gösterilen tutarın aynısını gönderin — onaylandıktan sonra cüzdan bakiyeniz otomatik güncellenir.",

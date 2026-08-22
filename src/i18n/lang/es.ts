@@ -255,13 +255,13 @@ const es: Messages = {
     "Ve a la pestaña Vendedor, configura tus proxies ascendentes (opcional) y haz clic en 'Iniciar vendedor'. Tu nodo se registrará en el mercado y empezará a recibir pruebas QoS. Tras superar los controles de calidad, tu conexión se clasifica por país y tipo de red, y queda disponible para los compradores. Ganas créditos por cada GB de tráfico que retransmites.",
   "faq.q3": "¿Cuáles son los tipos de red?",
   "faq.a3":
-    "ProxyBase clasifica las conexiones de los vendedores en cinco tipos: Residencial (ISP doméstico), Móvil (operador de telefonía), Centro de datos (IPs de nube/colo), ISP (IPs empresariales/estáticas) y Quemable (IPs de VPN/tor/proxy). Las IPs quemables se marcan durante las pruebas QoS y pueden recibir precios más bajos o estar restringidas en ciertos grupos de compradores.",
+    "ProxyBase clasifica las conexiones de los vendedores en cinco tipos: 🏠 Residencial (ISP doméstico), 📱 Móvil (operador de telefonía), 🏢 Centro de datos (IPs de nube/colo), 🌐 ISP (IPs empresariales/estáticas) y 🚩 Quemable (IPs de VPN/tor/proxy). Las IPs quemables se marcan durante las pruebas QoS y pueden recibir precios más bajos o estar restringidas en ciertos grupos de compradores.",
   "faq.q4": "¿Cómo compro una sesión de proxy?",
   "faq.a4":
     "Ve a la pestaña Mercado → Precios. Busca un país y un tipo de red con vendedores disponibles y haz clic en el botón verde 'Comprar' de esa fila. Se crea una sesión de proxy SOCKS5 que aparece en la pestaña 'Sesiones activas'. Tu saldo se debita por GB de tráfico utilizado. Cierra una sesión en cualquier momento con el botón X de su fila.",
   "faq.q5": "¿Cómo funcionan los microcréditos y los precios?",
   "faq.a5":
-    "1.000.000 de microcréditos = 1,00 USD. El precio se fija por país y tipo de red (p. ej., 0,50 USD/GB para residencial de EE. UU.). Los vendedores ganan créditos cuando los compradores usan sus proxies. Puedes depositar fondos con criptomonedas (BTC, USDC, USDT, SOL, etc.) a través de NOWPayments.",
+    "1.000.000 de microcréditos = 1,00 USD. El precio se fija por país y tipo de red (p. ej., 0,50 USD/GB para 🏠 residencial de EE. UU.). Los vendedores ganan créditos cuando los compradores usan sus proxies. Puedes depositar fondos con criptomonedas (BTC, USDC, USDT, SOL, etc.) a través de NOWPayments.",
   "faq.q6": "¿Qué es un depósito y cómo creo uno?",
   "faq.a6":
     "Abre la página Cuenta desde el icono de la cabecera y pulsa 'Añadir fondos'. Elige una cantidad (10, 20, 100 USD o personalizada) y una criptomoneda. Tras crearlo, irás a una página de depósito con la dirección de pago, el código QR y una cuenta atrás de 9 minutos. Envía exactamente la cantidad indicada a esa dirección: tu saldo se actualiza automáticamente al confirmarse.",

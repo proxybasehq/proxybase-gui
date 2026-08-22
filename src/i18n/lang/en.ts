@@ -254,13 +254,13 @@ const en = {
     "Go to the Seller tab, configure your upstream proxies (optional), and click 'Start Seller'. Your node will register with the marketplace and begin receiving QoS probes. After passing quality checks, your connection is classified by country and network type, and becomes available for buyers to purchase. You earn credits for every GB of traffic you relay.",
   "faq.q3": "What are the network types?",
   "faq.a3":
-    "ProxyBase classifies seller connections into five types: Residential (home ISP), Mobile (cellular carrier), Datacenter (cloud/colo IPs), ISP (business/static IPs), and Burner (VPN/tor/proxy IPs). Burner IPs are flagged during QoS probing and may receive lower pricing or be restricted from certain buyer pools.",
+    "ProxyBase classifies seller connections into five types: 🏠 Residential (home ISP), 📱 Mobile (cellular carrier), 🏢 Datacenter (cloud/colo IPs), 🌐 ISP (business/static IPs), and 🚩 Burner (VPN/tor/proxy IPs). Burner IPs are flagged during QoS probing and may receive lower pricing or be restricted from certain buyer pools.",
   "faq.q4": "How do I buy a proxy session?",
   "faq.a4":
     "Go to the Market tab → Prices. Find a country and network type with available sellers, then click the green 'Buy' button on that row. A SOCKS5 proxy session is created and appears under the 'Active Sessions' tab. Your wallet balance is debited per GB of traffic used. Close a session anytime by clicking the X button on its row.",
   "faq.q5": "How do microcredits and pricing work?",
   "faq.a5":
-    "1,000,000 microcredits = $1.00 USD. Pricing is set per country and network type (e.g. $0.50/GB for US residential). Sellers earn credits when buyers use their proxies. You can deposit funds using cryptocurrencies (BTC, USDC, USDT, SOL, etc.) via NOWPayments.",
+    "1,000,000 microcredits = $1.00 USD. Pricing is set per country and network type (e.g. $0.50/GB for US 🏠 residential). Sellers earn credits when buyers use their proxies. You can deposit funds using cryptocurrencies (BTC, USDC, USDT, SOL, etc.) via NOWPayments.",
   "faq.q6": "What is a deposit and how do I create one?",
   "faq.a6":
     "Open the Account page from the header icon, then tap 'Add Funds'. Choose an amount ($10, $20, $100, or custom) and a cryptocurrency. After creation you'll be taken to a deposit page showing the payment address, QR code, and a 9-minute countdown. Send exactly the shown amount to that address — your wallet balance updates automatically once confirmed.",

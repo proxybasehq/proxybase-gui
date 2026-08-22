@@ -250,13 +250,13 @@ const pl: Messages = {
     "Przejdź do zakładki Sprzedawca, skonfiguruj proxy nadrzędne (opcjonalnie) i kliknij „Uruchom sprzedawcę'. Twój węzeł zarejestruje się na rynku i zacznie otrzymywać sondy QoS. Po przejściu kontroli jakości Twoje połączenie zostanie sklasyfikowane według kraju i typu sieci oraz stanie się dostępne do zakupu. Zarabiasz kredyty za każdy przekaźnikowany GB ruchu.",
   "faq.q3": "Jakie są typy sieci?",
   "faq.a3":
-    "ProxyBase klasyfikuje połączenia sprzedawców na pięć typów: Rezydencjalne (domowy ISP), Mobilne (operator komórkowy), Datacenter (IP chmurowe/colo), ISP (IP biznesowe/statyczne) i Burner (IP VPN/tor/proxy). IP typu Burner są oznaczane podczas sond QoS i mogą otrzymywać niższe ceny lub być ograniczone dla niektórych pul kupujących.",
+    "ProxyBase klasyfikuje połączenia sprzedawców na pięć typów: 🏠 Rezydencjalne (domowy ISP), 📱 Mobilne (operator komórkowy), 🏢 Datacenter (IP chmurowe/colo), 🌐 ISP (IP biznesowe/statyczne) i 🚩 Burner (IP VPN/tor/proxy). IP typu Burner są oznaczane podczas sond QoS i mogą otrzymywać niższe ceny lub być ograniczone dla niektórych pul kupujących.",
   "faq.q4": "Jak kupić sesję proxy?",
   "faq.a4":
     "Przejdź do zakładki Rynek → Ceny. Znajdź kraj i typ sieci z dostępnymi sprzedawcami, a następnie kliknij zielony przycisk „Kup' w tym wierszu. Tworzona jest sesja proxy SOCKS5, która pojawia się w zakładce „Aktywne sesje'. Twoje saldo jest obciążane za każdy GB użytego ruchu. Sesję możesz zamknąć w dowolnym momencie, klikając przycisk X w jej wierszu.",
   "faq.q5": "Jak działają mikrokredyty i ceny?",
   "faq.a5":
-    "1 000 000 mikrokredytów = 1,00 USD. Cena jest ustalana dla każdego kraju i typu sieci (np. 0,50 USD/GB dla rezydencjalnych USA). Sprzedawcy zarabiają kredyty, gdy kupujący korzystają z ich proxy. Środki możesz wpłacać w kryptowalutach (BTC, USDC, USDT, SOL itd.) za pośrednictwem NOWPayments.",
+    "1 000 000 mikrokredytów = 1,00 USD. Cena jest ustalana dla każdego kraju i typu sieci (np. 0,50 USD/GB dla 🏠 rezydencjalnych USA). Sprzedawcy zarabiają kredyty, gdy kupujący korzystają z ich proxy. Środki możesz wpłacać w kryptowalutach (BTC, USDC, USDT, SOL itd.) za pośrednictwem NOWPayments.",
   "faq.q6": "Co to jest depozyt i jak go utworzyć?",
   "faq.a6":
     "Otwórz stronę Konto z ikony w nagłówku, a następnie dotknij „Dodaj środki'. Wybierz kwotę (10, 20, 100 USD lub własną) i kryptowalutę. Po utworzeniu zostaniesz przeniesiony na stronę depozytu z adresem płatności, kodem QR i 9-minutowym odliczaniem. Wyślij na ten adres dokładnie podaną kwotę — po potwierdzeniu saldo portfela zaktualizuje się automatycznie.",
