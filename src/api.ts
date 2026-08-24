@@ -152,6 +152,13 @@ export async function closeSession(
   return invoke("close_session", { backendUrl, sessionId });
 }
 
+export async function rotateSession(
+  backendUrl: string,
+  sessionId: string
+): Promise<Record<string, unknown>> {
+  return invoke("rotate_session", { backendUrl, sessionId });
+}
+
 export async function keepaliveSession(backendUrl: string, sessionId: string): Promise<void> {
   return invoke("keepalive_session", { backendUrl, sessionId });
 }

@@ -151,6 +151,9 @@ const tr: Messages = {
   "market.sticky": "Sabit (10dk)",
   "market.rotatingDesc": "Her istekte yeni IP",
   "market.stickyDesc": "10 dakikaya kadar aynı IP",
+  "market.rotateIp": "IP Değiştir",
+  "market.rotatingIp": "Değiştiriliyor...",
+  "market.rotateSuccess": "IP başarıyla değiştirildi",
   "market.closeSession": "Oturumu kapat",
 
   "seller.title": "Satıcı",

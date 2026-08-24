@@ -154,6 +154,9 @@ const es: Messages = {
   "market.sticky": "Persistente (10m)",
   "market.rotatingDesc": "IP nueva por solicitud",
   "market.stickyDesc": "Misma IP hasta 10 min",
+  "market.rotateIp": "Rotar IP",
+  "market.rotatingIp": "Rotando...",
+  "market.rotateSuccess": "IP rotada con éxito",
   "market.closeSession": "Cerrar sesión",
 
   "seller.title": "Vendedor",

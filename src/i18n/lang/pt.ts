@@ -154,6 +154,9 @@ const pt: Messages = {
   "market.sticky": "Persistente (10m)",
   "market.rotatingDesc": "Novo IP por requisição",
   "market.stickyDesc": "Mesmo IP por até 10 min",
+  "market.rotateIp": "Rotacionar IP",
+  "market.rotatingIp": "Rotacionando...",
+  "market.rotateSuccess": "IP rotacionado com sucesso",
   "market.closeSession": "Fechar sessão",
 
   "seller.title": "Vendedor",

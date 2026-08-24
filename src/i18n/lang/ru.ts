@@ -155,6 +155,9 @@ const ru: Messages = {
   "market.sticky": "Статичный (10м)",
   "market.rotatingDesc": "Новый IP на каждый запрос",
   "market.stickyDesc": "Один IP до 10 минут",
+  "market.rotateIp": "Сменить IP",
+  "market.rotatingIp": "Смена IP...",
+  "market.rotateSuccess": "IP успешно сменен",
   "market.closeSession": "Закрыть сессию",
 
   "seller.title": "Продавец",

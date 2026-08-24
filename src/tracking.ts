@@ -34,6 +34,7 @@ export const TrackEvent = {
   // Market
   SESSION_CREATE: "session_create",
   SESSION_CLOSE: "session_close",
+  SESSION_ROTATE: "session_rotate",
 
   // Deposit
   DEPOSIT_CREATE: "deposit_create",

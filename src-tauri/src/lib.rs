@@ -194,6 +194,7 @@ pub fn run() {
             commands::list_pricing,
             commands::create_session,
             commands::close_session,
+            commands::rotate_session,
             commands::list_sessions,
             commands::keepalive_session,
             commands::list_deposits,

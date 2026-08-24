@@ -150,6 +150,9 @@ const ar: Messages = {
   "market.sticky": "ثابت (10د)",
   "market.rotatingDesc": "عنوان IP جديد لكل طلب",
   "market.stickyDesc": "نفس عنوان IP حتى 10 دقائق",
+  "market.rotateIp": "تغيير IP",
+  "market.rotatingIp": "جارٍ التغيير...",
+  "market.rotateSuccess": "تم تغيير IP بنجاح",
   "market.closeSession": "إغلاق الجلسة",
 
   "seller.title": "البائع",

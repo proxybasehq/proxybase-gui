@@ -149,6 +149,9 @@ const vi: Messages = {
   "market.sticky": "Cố định (10p)",
   "market.rotatingDesc": "IP mới cho mỗi yêu cầu",
   "market.stickyDesc": "Giữ nguyên IP tối đa 10 phút",
+  "market.rotateIp": "Đổi IP",
+  "market.rotatingIp": "Đang đổi...",
+  "market.rotateSuccess": "Đổi IP thành công",
   "market.closeSession": "Đóng phiên",
 
   "seller.title": "Người bán",

@@ -330,6 +330,17 @@ impl BackendClient {
         response_json(resp).await
     }
 
+    pub async fn rotate_session(&self, session_id: &str) -> Result<serde_json::Value> {
+        let resp = self
+            .http
+            .post(format!("{}/v2/sessions/{}/rotate", self.base_url, session_id))
+            .header("Authorization", self.bearer())
+            .send()
+            .await
+            .context("Failed to send rotate session request")?;
+        response_json(resp).await
+    }
+
     pub async fn list_sessions(&self) -> Result<serde_json::Value> {
         let resp = self
             .http

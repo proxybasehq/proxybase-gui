@@ -150,6 +150,9 @@ const en = {
   "market.sticky": "Sticky (10m)",
   "market.rotatingDesc": "Fresh IP per request",
   "market.stickyDesc": "Same IP for up to 10 min",
+  "market.rotateIp": "Rotate IP",
+  "market.rotatingIp": "Rotating...",
+  "market.rotateSuccess": "IP rotated successfully",
   "market.closeSession": "Close session",
 
   // Seller

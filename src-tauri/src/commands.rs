@@ -369,6 +369,14 @@ pub async fn close_session(
 }
 
 #[tauri::command]
+pub async fn rotate_session(
+    backend_url: String,
+    session_id: String,
+) -> Result<serde_json::Value, String> {
+    call_api!(&backend_url, client, client.rotate_session(&session_id))
+}
+
+#[tauri::command]
 pub async fn list_sessions(backend_url: String) -> Result<serde_json::Value, String> {
     call_api!(&backend_url, client, client.list_sessions())
 }

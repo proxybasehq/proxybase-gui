@@ -153,6 +153,9 @@ const uk: Messages = {
   "market.sticky": "Статичний (10хв)",
   "market.rotatingDesc": "Новий IP на кожен запит",
   "market.stickyDesc": "Той самий IP до 10 хвилин",
+  "market.rotateIp": "Змінити IP",
+  "market.rotatingIp": "Зміна IP...",
+  "market.rotateSuccess": "IP успішно змінено",
   "market.closeSession": "Закрити сесію",
 
   "seller.title": "Продавець",

@@ -149,6 +149,9 @@ const ko: Messages = {
   "market.sticky": "스티키 (10분)",
   "market.rotatingDesc": "요청마다 새로운 IP",
   "market.stickyDesc": "최대 10분간 동일한 IP 유지",
+  "market.rotateIp": "IP 변경",
+  "market.rotatingIp": "변경 중...",
+  "market.rotateSuccess": "IP가 성공적으로 변경되었습니다",
   "market.closeSession": "세션 닫기",
 
   "seller.title": "판매자",

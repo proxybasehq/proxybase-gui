@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useOutletContext, Navigate } from "react-router-dom";
-import { listPricing, createSession, closeSession, listSessions, keepaliveSession, getToken, bridgeStart, bridgeStop, bridgePort } from "../api";
+import { listPricing, createSession, closeSession, rotateSession, listSessions, keepaliveSession, getToken, bridgeStart, bridgeStop, bridgePort } from "../api";
 import { load } from "@tauri-apps/plugin-store";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
@@ -89,6 +89,8 @@ export default function MarketPage() {
 
   const [sessions, setSessions] = useState<Array<Record<string, unknown>>>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [rotateSuccess, setRotateSuccess] = useState<string | null>(null);
   const [connectModal, setConnectModal] = useState<Record<string, unknown> | null>(null);
   const [connectTab, setConnectTab] = useState<"remote" | "local">("remote");
   const [bridgePorts, setBridgePorts] = useState<Record<string, number>>({});
@@ -264,6 +266,25 @@ export default function MarketPage() {
       await fetchSessions();
     } catch (e) { setError(String(e)); }
     setClosingId(null);
+  }
+
+  async function handleRotate(sessionId: string) {
+    setRotatingId(sessionId);
+    setError("");
+    setRotateSuccess(null);
+    try {
+      const res = await rotateSession(backendUrl, sessionId);
+      track(TrackEvent.SESSION_ROTATE, { sessionId });
+      setRotateSuccess(t("market.rotateSuccess"));
+      setTimeout(() => setRotateSuccess(null), 3000);
+      await fetchSessions();
+      if (connectModal && (connectModal as any).session_id === sessionId) {
+        setConnectModal((prev) => (prev ? { ...prev, ...res } : null));
+      }
+    } catch (e) {
+      setError(String(e));
+    }
+    setRotatingId(null);
   }
 
   async function handleBuyFromPrice(country: string, networkType: string) {
@@ -543,7 +564,41 @@ export default function MarketPage() {
               </>
             )}
 
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-md)", width: "100%" }} onClick={() => setConnectModal(null)}>{t("common.close")}</button>
+            {(connectModal as any).session_type === "sticky" && (
+              <div style={{ marginTop: "var(--space-md)", display: "flex", flexDirection: "column", gap: 6 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                  onClick={() => handleRotate((connectModal as any).session_id)}
+                  disabled={rotatingId === (connectModal as any).session_id}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      animation: rotatingId === (connectModal as any).session_id ? "spin 1s linear infinite" : "none"
+                    }}
+                  >
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                  {rotatingId === (connectModal as any).session_id ? t("market.rotatingIp") : t("market.rotateIp")}
+                </button>
+                {rotateSuccess && (
+                  <div style={{ fontSize: 11, color: "var(--color-success, #22c55e)", textAlign: "center" }}>
+                    {rotateSuccess}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: (connectModal as any).session_type === "sticky" ? "var(--space-xs)" : "var(--space-md)", width: "100%" }} onClick={() => { setConnectModal(null); setRotateSuccess(null); }}>{t("common.close")}</button>
           </div>
         </div>
       )}
@@ -659,7 +714,7 @@ export default function MarketPage() {
                     <th>{t("market.type")}</th>
                     <th>{t("market.mode")}</th>
                     <th>{t("common.status")}</th>
-                    <th className="table-action" style={{ width: 40 }}></th>
+                    <th className="table-action" style={{ width: 68 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -672,10 +727,36 @@ export default function MarketPage() {
                       <td>{emojiBadge(TYPE_EMOJI, (s as any).network_type || (s as any).proxy_category)}</td>
                       <td>{emojiBadge(MODE_EMOJI, (s as any).session_type)}</td>
                       <td>{emojiBadge(STATUS_EMOJI, (s as any).status)}</td>
-                      <td className="table-action" onClick={(e) => e.stopPropagation()}>
+                      <td className="table-action" onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
+                        {(s as any).session_type === "sticky" && (s as any).status === "active" && (
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            style={{ padding: "0 6px", height: 26, fontSize: 11, marginRight: 4 }}
+                            onClick={() => handleRotate((s as any).session_id)}
+                            disabled={rotatingId === (s as any).session_id || closingId === (s as any).session_id}
+                            title={t("market.rotateIp")}
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{
+                                animation: rotatingId === (s as any).session_id ? "spin 1s linear infinite" : "none"
+                              }}
+                            >
+                              <polyline points="23 4 23 10 17 10" />
+                              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                            </svg>
+                          </button>
+                        )}
                         <button className="btn btn-sm btn-danger" style={{ padding: "0 6px", height: 26, fontSize: 11 }}
                           onClick={() => handleClose((s as any).session_id)}
-                          disabled={closingId === (s as any).session_id} title={t("market.closeSession")}>
+                          disabled={closingId === (s as any).session_id || rotatingId === (s as any).session_id} title={t("market.closeSession")}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                           </svg>

@@ -143,6 +143,9 @@ const zh: Messages = {
   "market.sticky": "粘性 (10分钟)",
   "market.rotatingDesc": "每个请求更换新IP",
   "market.stickyDesc": "保持同一IP最长10分钟",
+  "market.rotateIp": "更换 IP",
+  "market.rotatingIp": "更换中...",
+  "market.rotateSuccess": "IP 更换成功",
   "market.closeSession": "关闭会话",
 
   "seller.title": "卖家",

@@ -151,6 +151,9 @@ const ja: Messages = {
   "market.sticky": "スティッキー (10分)",
   "market.rotatingDesc": "リクエストごとに新規IP",
   "market.stickyDesc": "最大10分間同一IPを維持",
+  "market.rotateIp": "IPを変更",
+  "market.rotatingIp": "ローテーション中...",
+  "market.rotateSuccess": "IPが正常に変更されました",
   "market.closeSession": "セッションを閉じる",
 
   "seller.title": "販売者",

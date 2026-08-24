@@ -150,6 +150,9 @@ const id: Messages = {
   "market.sticky": "Tetap (10m)",
   "market.rotatingDesc": "IP baru per permintaan",
   "market.stickyDesc": "IP yang sama hingga 10 menit",
+  "market.rotateIp": "Ganti IP",
+  "market.rotatingIp": "Mengganti...",
+  "market.rotateSuccess": "IP berhasil diganti",
   "market.closeSession": "Tutup sesi",
 
   "seller.title": "Penjual",
