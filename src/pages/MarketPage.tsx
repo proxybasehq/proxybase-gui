@@ -635,46 +635,37 @@ export default function MarketPage() {
       {/* ---- Prices Tab ---- */}
       {activeTab === "prices" && (
         <div className="card">
-          {/* Session Mode Selector */}
-          <div style={{ marginTop: "var(--space-sm)", marginBottom: "var(--space-xs)", padding: "var(--space-xs) var(--space-sm)", background: "var(--color-canvas-soft)", border: "1px solid var(--color-hairline)", borderRadius: "var(--rounded-md)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-sm)" }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-ink)" }}>{t("market.sessionType")}</div>
-                <div style={{ fontSize: 11, color: "var(--color-mute)", marginTop: 1 }}>
-                  {sessionType === "rotating" ? t("market.rotatingDesc") : t("market.stickyDesc")}
+          {/* Session Mode Selector & Filter Bar */}
+          <div style={{
+            marginTop: "var(--space-sm)",
+            marginBottom: "var(--space-xs)",
+            padding: "8px 12px",
+            background: "var(--color-canvas-soft)",
+            border: "1px solid var(--color-hairline)",
+            borderRadius: "var(--rounded-md)"
+          }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "var(--space-sm)"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-ink)" }}>{t("market.sessionType")}</div>
+                  <div style={{ fontSize: 11, color: "var(--color-mute)", marginTop: 1 }}>
+                    {sessionType === "rotating" ? t("market.rotatingDesc") : t("market.stickyDesc")}
+                  </div>
                 </div>
-              </div>
-              <div style={{ display: "flex", gap: "var(--space-sm)", alignItems: "center" }}>
-                {distinctCountries.length > 1 && (
-                  <select
-                    value={countryFilter}
-                    onChange={(e) => setCountryFilter(e.target.value)}
-                    style={{
-                      padding: "3px 8px",
-                      fontSize: 11,
-                      fontWeight: 500,
-                      borderRadius: "var(--rounded-sm)",
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-surface)",
-                      color: "var(--color-ink)",
-                      cursor: "pointer"
-                    }}
-                  >
-                    <option value="all">{t("market.allCountries") || "All Countries"}</option>
-                    {distinctCountries.map((c) => (
-                      <option key={c} value={c}>
-                        {c.toUpperCase() === "WORLDWIDE" ? "🌐 WorldWide (Random)" : c.toUpperCase() === "UNKNOWN" ? "❓ Unknown" : c}
-                      </option>
-                    ))}
-                  </select>
-                )}
                 <div style={{
                   display: "inline-flex",
                   borderRadius: "var(--rounded-md)",
                   border: "1px solid var(--color-hairline)",
                   padding: 2,
                   background: "var(--color-canvas-soft-2)",
-                  gap: 2
+                  gap: 2,
+                  flexShrink: 0
                 }}>
                   <button
                     type="button"
@@ -714,6 +705,33 @@ export default function MarketPage() {
                   </button>
                 </div>
               </div>
+
+              {distinctCountries.length > 1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  <select
+                    value={countryFilter}
+                    onChange={(e) => setCountryFilter(e.target.value)}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      borderRadius: "var(--rounded-sm)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-surface)",
+                      color: "var(--color-ink)",
+                      cursor: "pointer",
+                      maxWidth: 160
+                    }}
+                  >
+                    <option value="all">{t("market.allCountries") || "All Countries"}</option>
+                    {distinctCountries.map((c) => (
+                      <option key={c} value={c}>
+                        {c.toUpperCase() === "WORLDWIDE" ? "🌐 WorldWide" : c.toUpperCase() === "UNKNOWN" ? "❓ Unknown" : c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
           {pricesLoading && allPricing.length === 0 ? (
@@ -729,7 +747,6 @@ export default function MarketPage() {
                   {availablePrices.map((p, i) => {
                     const c = (p as any).country as string;
                     const nt = (p as any).network_type as string;
-                    const count = (p as any).available_sellers ?? 0;
                     const key = `${c}:${nt}`;
                     const loading = priceBuyLoading === key;
                     const isWw = c.toUpperCase() === "WORLDWIDE";
@@ -738,13 +755,8 @@ export default function MarketPage() {
                       <td style={{ whiteSpace: "nowrap" }}>
                         <CountryFlag code={c} />
                         <span style={{ fontSize: 12, fontWeight: isWw ? 600 : 400 }}>
-                          {isWw ? "WorldWide (Random)" : c === "Unknown" ? "Unknown" : c}
+                          {isWw ? "WorldWide" : c === "Unknown" ? "Unknown" : c}
                         </span>
-                        {count > 0 && (
-                          <span className="badge badge-subtle" style={{ marginLeft: 6, fontSize: 10 }}>
-                            {count} online
-                          </span>
-                        )}
                       </td>
                       <td>{emojiBadge(TYPE_EMOJI, nt)}</td>
                       <td className="font-mono">{formatUsdPerGb((p as any).buyer_price_microcredits_per_gb)}</td>

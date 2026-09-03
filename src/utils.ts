@@ -41,11 +41,11 @@ const COUNTRY_NAMES: Record<string, string> = {
   DK: "Denmark", FI: "Finland", NO: "Norway", PT: "Portugal",
   CZ: "Czechia", RO: "Romania", UA: "Ukraine", AE: "United Arab Emirates",
   SA: "Saudi Arabia", IL: "Israel", PK: "Pakistan", BD: "Bangladesh",
-  WORLDWIDE: "WorldWide (Random)", UNKNOWN: "Unknown",
+  WORLDWIDE: "WorldWide", UNKNOWN: "Unknown",
 };
 
 export function countryName(code: string): string {
-  if (code.toUpperCase() === "WORLDWIDE") return "WorldWide (Random)";
+  if (code.toUpperCase() === "WORLDWIDE") return "WorldWide";
   if (code.toUpperCase() === "UNKNOWN") return "Unknown";
   return COUNTRY_NAMES[code.toUpperCase()] || code.toUpperCase();
 }
