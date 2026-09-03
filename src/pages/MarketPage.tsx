@@ -4,7 +4,7 @@ import { listPricing, createSession, closeSession, rotateSession, listSessions, 
 import { load } from "@tauri-apps/plugin-store";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
-import { formatUsdPerGb, PROXY_ADDRESS } from "../utils";
+import { countryName, formatUsdPerGb, PROXY_ADDRESS } from "../utils";
 import { CountryFlag } from "../components/CountryFlag";
 import { track, TrackEvent } from "../tracking";
 import { useI18n } from "../i18n";
@@ -726,7 +726,7 @@ export default function MarketPage() {
                     <option value="all">{t("market.allCountries") || "All Countries"}</option>
                     {distinctCountries.map((c) => (
                       <option key={c} value={c}>
-                        {c.toUpperCase() === "WORLDWIDE" ? "🌐 WorldWide" : c.toUpperCase() === "UNKNOWN" ? "❓ Unknown" : c}
+                        {c.toUpperCase() === "WORLDWIDE" ? "🌐 WorldWide" : c.toUpperCase() === "UNKNOWN" ? "❓ Unknown" : countryName(c)}
                       </option>
                     ))}
                   </select>
@@ -755,7 +755,7 @@ export default function MarketPage() {
                       <td style={{ whiteSpace: "nowrap" }}>
                         <CountryFlag code={c} />
                         <span style={{ fontSize: 12, fontWeight: isWw ? 600 : 400 }}>
-                          {isWw ? "WorldWide" : c === "Unknown" ? "Unknown" : c}
+                          {countryName(c)}
                         </span>
                       </td>
                       <td>{emojiBadge(TYPE_EMOJI, nt)}</td>
