@@ -4,6 +4,12 @@ const flagMap = Flags as Record<string, React.FC<{ className?: string }>>;
 
 export function CountryFlag({ code }: { code: string }) {
   const upper = code.toUpperCase();
+  if (upper === "WORLDWIDE") {
+    return <span style={{ fontSize: 13, marginRight: 6, verticalAlign: "middle" }} title="WorldWide (Random)">🌐</span>;
+  }
+  if (upper === "UNKNOWN") {
+    return <span style={{ fontSize: 12, marginRight: 6, verticalAlign: "middle" }} title="Unknown">❓</span>;
+  }
   const Flag = flagMap[upper];
   if (!Flag) {
     return <span style={{ fontSize: 10, fontWeight: 600, marginRight: 6, verticalAlign: "middle" }}>{upper}</span>;

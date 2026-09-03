@@ -125,6 +125,7 @@ const en = {
   "market.sessionId": "Session ID",
   "market.password": "Password",
   "market.country": "Country",
+  "market.allCountries": "All Countries",
   "market.type": "Type",
   "market.exampleCurl": "Example (curl)",
   "market.localBridgeDesc":

@@ -16,7 +16,7 @@ import vi from "./lang/vi";
 import id from "./lang/id";
 
 /** All UI message keys, derived from the English dictionary. */
-export type Messages = typeof en;
+export type Messages = Partial<typeof en>;
 
 export const translations: Record<string, Messages> = {
   en,

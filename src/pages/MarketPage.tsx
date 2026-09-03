@@ -51,6 +51,7 @@ export default function MarketPage() {
 
   const [activeTab, setActiveTab] = useState<"prices" | "sessions">("prices");
   const [sessionType, setSessionType] = useState<"rotating" | "sticky">("rotating");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
   const [error, setError] = useState("");
   const [insufficientFunds, setInsufficientFunds] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -328,15 +329,43 @@ export default function MarketPage() {
   }
 
 
+  const distinctCountries = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of allPricing) {
+      if (((p as any).available_sellers ?? 0) > 0) {
+        set.add(String((p as any).country ?? ""));
+      }
+    }
+    const list = Array.from(set);
+    list.sort((a, b) => {
+      const ca = a.toUpperCase();
+      const cb = b.toUpperCase();
+      if (ca === "WORLDWIDE") return -1;
+      if (cb === "WORLDWIDE") return 1;
+      return a.localeCompare(b);
+    });
+    return list;
+  }, [allPricing]);
+
   const availablePrices = useMemo(() => {
     return allPricing
-      .filter((p) => ((p as any).available_sellers ?? 0) > 0)
+      .filter((p) => {
+        if (((p as any).available_sellers ?? 0) <= 0) return false;
+        if (countryFilter !== "all") {
+          return String((p as any).country ?? "").toUpperCase() === countryFilter.toUpperCase();
+        }
+        return true;
+      })
       .sort((a, b) => {
+        const ca = String((a as any).country ?? "").toUpperCase();
+        const cb = String((b as any).country ?? "").toUpperCase();
+        if (ca === "WORLDWIDE" && cb !== "WORLDWIDE") return -1;
+        if (cb === "WORLDWIDE" && ca !== "WORLDWIDE") return 1;
         const ka = `${(a as any).country}:${(a as any).network_type}`;
         const kb = `${(b as any).country}:${(b as any).network_type}`;
-        return ka < kb ? -1 : ka > kb ? 1 : 0;
+        return ka.localeCompare(kb);
       });
-  }, [allPricing]);
+  }, [allPricing, countryFilter]);
 
   useEffect(() => { fetchToken(); }, []);
   useEffect(() => {
@@ -615,43 +644,75 @@ export default function MarketPage() {
                   {sessionType === "rotating" ? t("market.rotatingDesc") : t("market.stickyDesc")}
                 </div>
               </div>
-              <div style={{ display: "inline-flex", background: "var(--color-canvas-soft-2)", padding: "2px", borderRadius: "var(--rounded-md)", border: "1px solid var(--color-hairline)", flexShrink: 0 }}>
-                <button
-                  type="button"
-                  style={{
-                    padding: "3px 10px",
-                    fontSize: 11,
-                    fontWeight: 500,
-                    borderRadius: "var(--rounded-sm)",
-                    border: "none",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                    background: sessionType === "rotating" ? "var(--color-canvas)" : "transparent",
-                    boxShadow: sessionType === "rotating" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
-                    color: sessionType === "rotating" ? "var(--color-ink)" : "var(--color-mute)"
-                  }}
-                  onClick={() => setSessionType("rotating")}
-                >
-                  {t("market.rotating")}
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    padding: "3px 10px",
-                    fontSize: 11,
-                    fontWeight: 500,
-                    borderRadius: "var(--rounded-sm)",
-                    border: "none",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                    background: sessionType === "sticky" ? "var(--color-canvas)" : "transparent",
-                    boxShadow: sessionType === "sticky" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
-                    color: sessionType === "sticky" ? "var(--color-ink)" : "var(--color-mute)"
-                  }}
-                  onClick={() => setSessionType("sticky")}
-                >
-                  {t("market.sticky")}
-                </button>
+              <div style={{ display: "flex", gap: "var(--space-sm)", alignItems: "center" }}>
+                {distinctCountries.length > 1 && (
+                  <select
+                    value={countryFilter}
+                    onChange={(e) => setCountryFilter(e.target.value)}
+                    style={{
+                      padding: "3px 8px",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      borderRadius: "var(--rounded-sm)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-surface)",
+                      color: "var(--color-ink)",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value="all">{t("market.allCountries") || "All Countries"}</option>
+                    {distinctCountries.map((c) => (
+                      <option key={c} value={c}>
+                        {c.toUpperCase() === "WORLDWIDE" ? "🌐 WorldWide (Random)" : c.toUpperCase() === "UNKNOWN" ? "❓ Unknown" : c}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <div style={{
+                  display: "inline-flex",
+                  borderRadius: "var(--rounded-md)",
+                  border: "1px solid var(--color-hairline)",
+                  padding: 2,
+                  background: "var(--color-canvas-soft-2)",
+                  gap: 2
+                }}>
+                  <button
+                    type="button"
+                    style={{
+                      padding: "3px 10px",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      borderRadius: "var(--rounded-sm)",
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      background: sessionType === "rotating" ? "var(--color-canvas)" : "transparent",
+                      boxShadow: sessionType === "rotating" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                      color: sessionType === "rotating" ? "var(--color-ink)" : "var(--color-mute)"
+                    }}
+                    onClick={() => setSessionType("rotating")}
+                  >
+                    {t("market.rotating")}
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      padding: "3px 10px",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      borderRadius: "var(--rounded-sm)",
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      background: sessionType === "sticky" ? "var(--color-canvas)" : "transparent",
+                      boxShadow: sessionType === "sticky" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                      color: sessionType === "sticky" ? "var(--color-ink)" : "var(--color-mute)"
+                    }}
+                    onClick={() => setSessionType("sticky")}
+                  >
+                    {t("market.sticky")}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -668,13 +729,22 @@ export default function MarketPage() {
                   {availablePrices.map((p, i) => {
                     const c = (p as any).country as string;
                     const nt = (p as any).network_type as string;
+                    const count = (p as any).available_sellers ?? 0;
                     const key = `${c}:${nt}`;
                     const loading = priceBuyLoading === key;
+                    const isWw = c.toUpperCase() === "WORLDWIDE";
                     return (
                     <tr key={i}>
                       <td style={{ whiteSpace: "nowrap" }}>
                         <CountryFlag code={c} />
-                        <span style={{ fontSize: 12 }}>{c}</span>
+                        <span style={{ fontSize: 12, fontWeight: isWw ? 600 : 400 }}>
+                          {isWw ? "WorldWide (Random)" : c === "Unknown" ? "Unknown" : c}
+                        </span>
+                        {count > 0 && (
+                          <span className="badge badge-subtle" style={{ marginLeft: 6, fontSize: 10 }}>
+                            {count} online
+                          </span>
+                        )}
                       </td>
                       <td>{emojiBadge(TYPE_EMOJI, nt)}</td>
                       <td className="font-mono">{formatUsdPerGb((p as any).buyer_price_microcredits_per_gb)}</td>
