@@ -21,8 +21,57 @@ export function CountrySelect({
 }: CountrySelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({
+    left: 0,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Position dropdown intelligently to prevent viewport overflow (left or right)
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    function updatePosition() {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const menuWidth = 220;
+      const margin = 10;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+
+      const spaceRight = viewportWidth - rect.left - margin;
+      const spaceLeft = rect.right - margin;
+
+      if (spaceRight >= menuWidth) {
+        // Fits comfortably extending to the right: align to left edge of trigger button
+        setDropdownStyle({
+          left: 0,
+          right: "auto",
+          maxWidth: `${spaceRight}px`,
+        });
+      } else if (spaceLeft >= menuWidth) {
+        // Not enough room on the right, but fits on the left: align to right edge
+        setDropdownStyle({
+          right: 0,
+          left: "auto",
+          maxWidth: `${spaceLeft}px`,
+        });
+      } else {
+        // Very tight viewport: clamp within screen bounds
+        const shiftLeft = Math.max(0, rect.left - margin);
+        setDropdownStyle({
+          left: -shiftLeft,
+          right: "auto",
+          width: `calc(100vw - ${margin * 2}px)`,
+          maxWidth: "calc(100vw - 20px)",
+        });
+      }
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    return () => window.removeEventListener("resize", updatePosition);
+  }, [isOpen]);
+
 
   // Close on outside click
   useEffect(() => {
@@ -148,7 +197,6 @@ export function CountrySelect({
           style={{
             position: "absolute",
             top: "calc(100% + 4px)",
-            right: 0,
             zIndex: 1100,
             minWidth: 200,
             maxWidth: 260,
@@ -159,6 +207,7 @@ export function CountrySelect({
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
+            ...dropdownStyle,
           }}
         >
           {/* Search input if multiple countries */}
