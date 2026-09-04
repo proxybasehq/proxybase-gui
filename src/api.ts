@@ -129,6 +129,33 @@ export async function listPricing(backendUrl: string): Promise<Record<string, un
   return invoke("list_pricing", { backendUrl });
 }
 
+export interface CountryMetadata {
+  country: string;
+  country_code: string;
+  country_name: string;
+  flag_emoji: string;
+}
+
+export async function getCountryName(codeOrName: string): Promise<string> {
+  return invoke("country_name", { codeOrName });
+}
+
+export async function getCountryCode(codeOrName: string): Promise<string> {
+  return invoke("country_code", { codeOrName });
+}
+
+export async function getCountryFlag(codeOrName: string): Promise<string> {
+  return invoke("country_flag", { codeOrName });
+}
+
+export async function getAllCountries(): Promise<Array<[string, string]>> {
+  return invoke("get_all_countries");
+}
+
+export async function getAllCountryMetadata(): Promise<CountryMetadata[]> {
+  return invoke("get_all_country_metadata");
+}
+
 export async function createSession(
   backendUrl: string,
   country: string,

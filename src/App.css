@@ -3,6 +3,14 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap');
 
+/* Bundled cross-platform country flag emoji webfont for Windows WebView2 & Linux */
+@font-face {
+  font-family: "Twemoji Country Flags";
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F;
+  src: url('/fonts/TwemojiCountryFlags.woff2') format('woff2');
+  font-display: swap;
+}
+
 /* ---- Color Tokens ---- */
 :root {
   --color-primary: #171717;
@@ -40,9 +48,10 @@
   --rounded-lg: 12px;
   --rounded-pill: 100px;
 
-  /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  /* Typography — with cross-platform emoji font fallbacks */
+  --font-sans: 'Twemoji Country Flags', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+  --font-mono: 'Twemoji Country Flags', 'JetBrains Mono', 'Fira Code', monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+
 
   /* Shadows — stacked + inset hairline */
   --shadow-card: 0 0 0 1px rgba(0,0,0,0.08), 0px 1px 1px rgba(0,0,0,0.02), 0px 2px 2px rgba(0,0,0,0.04);

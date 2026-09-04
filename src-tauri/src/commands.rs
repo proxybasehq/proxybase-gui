@@ -340,13 +340,86 @@ pub async fn list_payouts(backend_url: String) -> Result<serde_json::Value, Stri
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
+pub fn country_name(code_or_name: String) -> String {
+    libproxybase::market::countries::country_name(&code_or_name)
+}
+
+#[tauri::command]
+pub fn country_code(code_or_name: String) -> String {
+    libproxybase::market::countries::country_code(&code_or_name)
+}
+
+#[tauri::command]
+pub fn country_flag(code_or_name: String) -> String {
+    libproxybase::market::countries::country_flag(&code_or_name)
+}
+
+#[tauri::command]
+pub fn get_all_countries() -> Vec<(&'static str, &'static str)> {
+    libproxybase::market::countries::ISO_COUNTRIES.to_vec()
+}
+
+#[tauri::command]
+pub fn get_all_country_metadata() -> Vec<libproxybase::market::countries::CountryMetadata> {
+    libproxybase::market::countries::all_country_metadata()
+}
+
+#[tauri::command]
 pub async fn list_countries(backend_url: String) -> Result<serde_json::Value, String> {
-    call_api!(&backend_url, client, client.list_countries())
+    let mut resp = call_api!(&backend_url, client, client.list_countries())?;
+    if let Some(arr) = resp.get_mut("countries").and_then(|v| v.as_array_mut()) {
+        arr.retain(|item| {
+            let c = item.get("country").and_then(|v| v.as_str()).unwrap_or("");
+            !c.trim().is_empty()
+        });
+        for item in arr.iter_mut() {
+            if let Some(obj) = item.as_object_mut() {
+                let c_str = obj.get("country").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                if !obj.contains_key("country_code") {
+                    let code = libproxybase::market::countries::country_code(&c_str);
+                    obj.insert("country_code".to_string(), serde_json::Value::String(code));
+                }
+                if !obj.contains_key("country_name") {
+                    let name = libproxybase::market::countries::country_name(&c_str);
+                    obj.insert("country_name".to_string(), serde_json::Value::String(name));
+                }
+                if !obj.contains_key("flag_emoji") {
+                    let flag = libproxybase::market::countries::country_flag(&c_str);
+                    obj.insert("flag_emoji".to_string(), serde_json::Value::String(flag));
+                }
+            }
+        }
+    }
+    Ok(resp)
 }
 
 #[tauri::command]
 pub async fn list_pricing(backend_url: String) -> Result<serde_json::Value, String> {
-    call_api!(&backend_url, client, client.list_pricing())
+    let mut resp = call_api!(&backend_url, client, client.list_pricing())?;
+    if let Some(entries) = resp.get_mut("pricing").and_then(|p| p.as_array_mut()) {
+        entries.retain(|e| {
+            let c = e.get("country").and_then(|v| v.as_str()).unwrap_or("");
+            !c.trim().is_empty()
+        });
+        for e in entries.iter_mut() {
+            if let Some(obj) = e.as_object_mut() {
+                let c_str = obj.get("country").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                if !obj.contains_key("country_code") {
+                    let code = libproxybase::market::countries::country_code(&c_str);
+                    obj.insert("country_code".to_string(), serde_json::Value::String(code));
+                }
+                if !obj.contains_key("country_name") {
+                    let name = libproxybase::market::countries::country_name(&c_str);
+                    obj.insert("country_name".to_string(), serde_json::Value::String(name));
+                }
+                if !obj.contains_key("flag_emoji") {
+                    let flag = libproxybase::market::countries::country_flag(&c_str);
+                    obj.insert("flag_emoji".to_string(), serde_json::Value::String(flag));
+                }
+            }
+        }
+    }
+    Ok(resp)
 }
 
 #[tauri::command]
@@ -357,7 +430,8 @@ pub async fn create_session(
     session_type: String,
     spend_cap: Option<i64>,
 ) -> Result<serde_json::Value, String> {
-    call_api!(&backend_url, client, client.create_session(&country, &network_type, &session_type, spend_cap))
+    let norm_country = libproxybase::market::countries::normalize_country(&country);
+    call_api!(&backend_url, client, client.create_session(&norm_country, &network_type, &session_type, spend_cap))
 }
 
 #[tauri::command]

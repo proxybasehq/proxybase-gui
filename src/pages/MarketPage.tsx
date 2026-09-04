@@ -4,15 +4,16 @@ import { listPricing, createSession, closeSession, rotateSession, listSessions, 
 import { load } from "@tauri-apps/plugin-store";
 import type { AppContext } from "../components/Layout";
 import { useBackend } from "../hooks/useBackend";
-import { countryName, formatUsdPerGb, PROXY_ADDRESS } from "../utils";
+import { countryFlag, countryName, formatUsdPerGb, PROXY_ADDRESS } from "../utils";
 import { CountryFlag } from "../components/CountryFlag";
+import { CountrySelect } from "../components/CountrySelect";
 import { track, TrackEvent } from "../tracking";
 import { useI18n } from "../i18n";
 
 // View-only mappings: system types stay untouched, only the rendered text
-// changes. All glyphs are Emoji 0.6 (Unicode 6.0) so they render on every
-// desktop OS and Android WebView.
-const EMOJI_FONT = "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+// changes. Cross-platform font stack supporting Twemoji, Apple, Segoe UI, and Noto emojis.
+const EMOJI_FONT = "'Twemoji Country Flags', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+
 const TYPE_EMOJI: Record<string, string> = {
   burner: "🚩",
   mobile: "📱",
@@ -72,12 +73,12 @@ export default function MarketPage() {
   }
 
   function copyTr({ label, value, full }: { label: string; value: string; full?: string }) {
-    const display = full ?? value;
+    const copyVal = full ?? value;
     return (
-      <tr onClick={() => copyToClipboard(full ?? value, label)} style={{ cursor: "pointer" }}>
+      <tr onClick={() => copyToClipboard(copyVal, label)} style={{ cursor: "pointer" }}>
         <td style={{ color: "var(--color-mute)", fontSize: 12, padding: "4px 12px 4px 0", whiteSpace: "nowrap" }}>{label}</td>
         <td className="font-mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
-          {display}
+          {value}
           {copied === label && <span style={{ color: "#22c55e", marginLeft: 4, fontSize: 10 }}>{t("common.copied")}</span>}
         </td>
       </tr>
@@ -332,8 +333,9 @@ export default function MarketPage() {
   const distinctCountries = useMemo(() => {
     const set = new Set<string>();
     for (const p of allPricing) {
-      if (((p as any).available_sellers ?? 0) > 0) {
-        set.add(String((p as any).country ?? ""));
+      const c = String((p as any).country ?? "").trim();
+      if (c && ((p as any).available_sellers ?? 0) > 0) {
+        set.add(c);
       }
     }
     const list = Array.from(set);
@@ -342,7 +344,7 @@ export default function MarketPage() {
       const cb = b.toUpperCase();
       if (ca === "WORLDWIDE") return -1;
       if (cb === "WORLDWIDE") return 1;
-      return a.localeCompare(b);
+      return countryName(a).localeCompare(countryName(b));
     });
     return list;
   }, [allPricing]);
@@ -350,9 +352,11 @@ export default function MarketPage() {
   const availablePrices = useMemo(() => {
     return allPricing
       .filter((p) => {
+        const c = String((p as any).country ?? "").trim();
+        if (!c) return false;
         if (((p as any).available_sellers ?? 0) <= 0) return false;
         if (countryFilter !== "all") {
-          return String((p as any).country ?? "").toUpperCase() === countryFilter.toUpperCase();
+          return c.toUpperCase() === countryFilter.trim().toUpperCase();
         }
         return true;
       })
@@ -550,7 +554,14 @@ export default function MarketPage() {
                     {copyTr({ label: t("common.username"), value: (connectModal as any).session_id })}
                     {copyTr({ label: t("market.sessionId"), value: (connectModal as any).session_id })}
                     {copyTr({ label: t("market.password"), value: token.slice(0, 20) + "...", full: token })}
-                    {copyTr({ label: t("market.country"), value: (connectModal as any).country })}
+                    {copyTr({
+                      label: t("market.country"),
+                      value: (connectModal as any).country
+                        ? `${countryFlag((connectModal as any).country)} ${countryName((connectModal as any).country)} (${(connectModal as any).country})`
+                        : "-",
+                      full: (connectModal as any).country || "-",
+                    })}
+
                     {copyTr({ label: t("market.type"), value: (connectModal as any).network_type || (connectModal as any).proxy_category })}
                     {copyTr({ label: t("market.mode"), value: (connectModal as any).session_type || "rotating" })}
                   </tbody>
@@ -708,30 +719,15 @@ export default function MarketPage() {
 
               {distinctCountries.length > 1 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                  <select
+                  <CountrySelect
                     value={countryFilter}
-                    onChange={(e) => setCountryFilter(e.target.value)}
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: 11,
-                      fontWeight: 500,
-                      borderRadius: "var(--rounded-sm)",
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-surface)",
-                      color: "var(--color-ink)",
-                      cursor: "pointer",
-                      maxWidth: 160
-                    }}
-                  >
-                    <option value="all">{t("market.allCountries") || "All Countries"}</option>
-                    {distinctCountries.map((c) => (
-                      <option key={c} value={c}>
-                        {c.toUpperCase() === "WORLDWIDE" ? "🌐 WorldWide" : c.toUpperCase() === "UNKNOWN" ? "❓ Unknown" : countryName(c)}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setCountryFilter}
+                    countries={distinctCountries}
+                    allLabel={t("market.allCountries") || "All Countries"}
+                  />
                 </div>
               )}
+
             </div>
           </div>
           {pricesLoading && allPricing.length === 0 ? (
@@ -804,8 +800,9 @@ export default function MarketPage() {
                     <tr key={(s as any).session_id} style={{ cursor: "pointer" }} onClick={() => setConnectModal(s)}>
                       <td style={{ whiteSpace: "nowrap" }}>
                         <CountryFlag code={(s as any).country} />
-                        <span style={{ fontSize: 12 }}>{(s as any).country}</span>
+                        <span style={{ fontSize: 12 }}>{countryName((s as any).country) || (s as any).country}</span>
                       </td>
+
                       <td>{emojiBadge(TYPE_EMOJI, (s as any).network_type || (s as any).proxy_category)}</td>
                       <td>{emojiBadge(MODE_EMOJI, (s as any).session_type)}</td>
                       <td>{emojiBadge(STATUS_EMOJI, (s as any).status)}</td>
