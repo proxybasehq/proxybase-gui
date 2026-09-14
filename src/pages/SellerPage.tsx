@@ -38,6 +38,10 @@ export default function SellerPage() {
 
   async function handleStart() {
     setStartError("");
+    if (!includeDirect && upstreams.length === 0) {
+      setStartError(t("seller.upstreamRequiredNoDirect"));
+      return;
+    }
     try {
       await startSeller(backendUrl, upstreams, includeDirect, isVolunteer);
     } catch (e) {

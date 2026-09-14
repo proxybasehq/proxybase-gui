@@ -154,6 +154,7 @@ const zh: Messages = {
   "seller.refreshStatus": "刷新状态",
   "seller.startStop": "启动 / 停止卖家",
   "seller.includeDirect": "包含直连（出售自己的带宽）",
+  "seller.upstreamRequiredNoDirect": "禁用直连时，至少需要添加一个上游代理。",
   "seller.volunteerMode": "志愿模式（无偿向网络捐赠带宽）",
   "seller.upstreamProxies": "上游代理（转售）",
   "seller.hostPort": "主机:端口",

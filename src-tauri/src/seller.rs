@@ -292,10 +292,14 @@ fn build_paths(
     for (i, u) in upstreams.iter().enumerate() {
         paths.push((format!("upstream_{}", i), Some(u.clone())));
     }
-    if paths.is_empty() {
-        paths.push(("direct".to_string(), None));
-    }
     paths
+}
+
+fn validate_seller_paths(upstreams: &[UpstreamProxy], include_direct: bool) -> Result<()> {
+    if !include_direct && upstreams.is_empty() {
+        anyhow::bail!("At least one upstream proxy is required when direct mode is disabled");
+    }
+    Ok(())
 }
 
 pub async fn run_seller_ws_loop<R: tauri::Runtime + 'static>(
@@ -305,6 +309,7 @@ pub async fn run_seller_ws_loop<R: tauri::Runtime + 'static>(
     include_direct: bool,
     shutdown_rx: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<()> {
+    validate_seller_paths(&upstreams, include_direct)?;
     let paths = build_paths(&upstreams, include_direct);
     let base_url = backend_url.clone();
 
@@ -639,10 +644,11 @@ pub async fn start_seller(
     upstreams_json: String,
     include_direct: bool,
 ) -> Result<(), String> {
-    let _ = stop_seller(state.clone()).await;
-
     let upstreams: Vec<UpstreamProxy> = serde_json::from_str(&upstreams_json)
         .map_err(|e| format!("Invalid upstreams: {}", e))?;
+    validate_seller_paths(&upstreams, include_direct).map_err(|e| e.to_string())?;
+
+    let _ = stop_seller(state.clone()).await;
 
     let (tx, rx) = tokio::sync::oneshot::channel();
 
@@ -733,13 +739,14 @@ mod tests {
     }
 
     #[test]
-    fn test_build_paths_no_direct_empty_upstreams_fallback() {
-        // When include_direct is false and upstreams empty, falls back to direct
+    fn test_validate_seller_paths_rejects_empty_without_direct() {
         let upstreams = vec![];
-        let paths = build_paths(&upstreams, false);
-        assert_eq!(paths.len(), 1);
-        assert_eq!(paths[0].0, "direct");
-        assert!(paths[0].1.is_none());
+        assert!(validate_seller_paths(&upstreams, false).is_err());
+    }
+
+    #[test]
+    fn test_build_paths_no_direct_empty_upstreams_returns_no_paths() {
+        assert!(build_paths(&[], false).is_empty());
     }
 
     #[test]
