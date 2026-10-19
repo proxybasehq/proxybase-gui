@@ -169,9 +169,20 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # setup-android@v3 defaults to "tools platform-tools", but the legacy
+          # "tools" package was removed from the SDK repository and makes
+          # sdkmanager fail. Install only platform-tools here; the components
+          # required by the Gradle project are installed explicitly below.
+          packages: "platform-tools"
 
-      - name: Install NDK
-        run: sdkmanager "ndk;27.0.11902837"
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.0.11902837"
 
       - name: Add NDK toolchain to PATH
         run: echo "$ANDROID_HOME/ndk/27.0.11902837/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
