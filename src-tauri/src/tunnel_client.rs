@@ -435,6 +435,25 @@ fn sidecar_path() -> Option<std::path::PathBuf> {
     if direct.exists() {
         return Some(direct);
     }
+    // Dev builds: `scripts/prepare-sidecar.mjs` places the target-suffixed
+    // binary in src-tauri/binaries, which is not next to the dev executable.
+    #[cfg(debug_assertions)]
+    {
+        let dev_binaries = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries");
+        if let Ok(entries) = std::fs::read_dir(&dev_binaries) {
+            for entry in entries.flatten() {
+                let candidate = entry.path();
+                if candidate
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n.starts_with("proxybase-tunneld-"))
+                    .unwrap_or(false)
+                {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
     // Tauri externalBin layout (target-triple suffixed) as a fallback.
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {

@@ -67,6 +67,24 @@ Every route/DNS mutation is preceded by an atomic journal write
 `recover_if_dirty()` before binding its IPC socket. Dynamic Windows WFP filters
 are removed by the kernel if the process dies.
 
+## CI / standalone repository builds
+
+`scripts/prepare-sidecar.mjs` builds the daemon directly with
+`--manifest-path crates/proxybase-tunneld/Cargo.toml`, so it works both in the
+local monorepo (where the crate is a workspace member) and in the standalone
+`proxybase-gui` checkout used by CI. It shares `src-tauri/target` with Tauri so
+the Rust cache covers the daemon.
+
+The workflow checks out `libproxybase` next to the GUI repository and links it
+to `../libproxybase`; the daemon's `../../../libproxybase` path dependency
+resolves through that link. **Both repositories must contain the tunnel
+changes**: `libproxybase` (the `tunnel` module and its dependencies) and
+`proxybase-gui` (the `crates/proxybase-tunneld` daemon, UI, and scripts).
+
+The script also produces `proxybase-tunneld-universal-apple-darwin` (via
+`lipo`) for `--target universal-apple-darwin`, and skips sidecar builds for
+Android/iOS (which use the in-process VpnService engine).
+
 ## Tests
 
 ```bash
