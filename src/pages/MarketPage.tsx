@@ -27,13 +27,6 @@ const MODE_EMOJI: Record<string, string> = {
   rotating: "🔄",
   sticky: "📌",
 };
-const STATUS_EMOJI: Record<string, string> = {
-  active: "✅",
-  alive: "✅",
-  open: "⏳",
-  closed: "❌",
-  failed: "⚠️",
-};
 
 function emojiBadge(map: Record<string, string>, value: unknown) {
   const raw = String(value ?? "-");
@@ -808,8 +801,10 @@ export default function MarketPage() {
                     <th>{t("market.country")}</th>
                     <th>{t("market.type")}</th>
                     <th>{t("market.mode")}</th>
-                    <th>{t("common.status")}</th>
-                    <th>{t("tunnel.column")}</th>
+                    <th>
+                      <span style={{ fontFamily: EMOJI_FONT, marginRight: 4 }}>🛡️</span>
+                      {t("tunnel.column")}
+                    </th>
                     <th className="table-action" style={{ width: 68 }}></th>
                   </tr>
                 </thead>
@@ -823,7 +818,6 @@ export default function MarketPage() {
 
                       <td>{emojiBadge(TYPE_EMOJI, (s as any).network_type || (s as any).proxy_category)}</td>
                       <td>{emojiBadge(MODE_EMOJI, (s as any).session_type)}</td>
-                      <td>{emojiBadge(STATUS_EMOJI, (s as any).status)}</td>
                       <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
                         {["active", "alive", "open"].includes(String((s as any).status)) ? (
                           <TunnelToggleButton proxyId={(s as any).session_id} compact />

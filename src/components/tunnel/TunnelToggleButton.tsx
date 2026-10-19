@@ -1,6 +1,14 @@
 import { useSystemTunnel } from "../../hooks/useSystemTunnel";
 import { useI18n } from "../../i18n";
 
+const EMOJI_FONT =
+  "'Twemoji Country Flags', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+
+/** Shield = protected / tunneled traffic. */
+const TUNNEL_EMOJI = "🛡️";
+/** Used when this row would hot-swap an existing tunnel to another proxy. */
+const SWITCH_EMOJI = "🔀";
+
 interface Props {
   proxyId: string;
   /** Compact variant for table rows. */
@@ -35,13 +43,21 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
     state.status === "reconnecting" ||
     state.status === "disconnecting";
 
-  const label = sameProxy
-    ? t("tunnel.active")
-    : otherProxy
-      ? t("tunnel.switchHere")
-      : inProgress
-        ? t("tunnel.connecting")
-        : t("tunnel.enable");
+  const label = compact
+    ? sameProxy
+      ? t("tunnel.shortActive")
+      : otherProxy
+        ? t("tunnel.shortSwitch")
+        : inProgress
+          ? t("tunnel.shortConnecting")
+          : t("tunnel.shortTunnel")
+    : sameProxy
+      ? t("tunnel.active")
+      : otherProxy
+        ? t("tunnel.switchHere")
+        : inProgress
+          ? t("tunnel.connecting")
+          : t("tunnel.enable");
 
   const errorMessage = state.status === "error" ? state.message : undefined;
 
@@ -50,8 +66,24 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
       className={`btn ${sameProxy ? "btn-success" : "btn-secondary"} ${compact ? "btn-sm" : ""} ${className}`}
       style={
         compact
-          ? { padding: "0 8px", height: 26, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }
-          : undefined
+          ? {
+              padding: "0 10px",
+              height: 27,
+              fontSize: 11,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              borderRadius: 999,
+            }
+          : {
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 7,
+            }
       }
       disabled={busy || inProgress}
       title={errorMessage || label}
@@ -64,21 +96,32 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
         }
       }}
     >
-      {inProgress && (
+      {inProgress ? (
         <svg
-          width="11"
-          height="11"
+          width="12"
+          height="12"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
           strokeLinecap="round"
-          style={{ marginRight: 5, animation: "spin 1s linear infinite" }}
+          style={{ animation: "spin 1s linear infinite" }}
         >
           <path d="M21 12a9 9 0 1 1-6.22-8.56" />
         </svg>
+      ) : (
+        <span
+          aria-hidden="true"
+          style={{
+            fontFamily: EMOJI_FONT,
+            fontSize: compact ? 13 : 15,
+            lineHeight: 1,
+          }}
+        >
+          {otherProxy ? SWITCH_EMOJI : TUNNEL_EMOJI}
+        </span>
       )}
-      {label}
+      <span>{label}</span>
     </button>
   );
 }
