@@ -320,13 +320,28 @@ pub async fn run_seller_ws_loop<R: tauri::Runtime + 'static>(
     let cancel = CancellationToken::new();
 
     let mut handles = Vec::new();
-    for (path_id, upstream) in paths {
-        let app = app_handle.clone();
-        let url = base_url.clone();
-        let child_cancel = cancel.clone();
-        handles.push(tokio::spawn(async move {
-            run_single_path_loop(app, &url, &path_id, upstream.as_ref(), child_cancel).await;
-        }));
+
+    if paths.len() <= 1 {
+        for (path_id, upstream) in paths {
+            let app = app_handle.clone();
+            let url = base_url.clone();
+            let child_cancel = cancel.clone();
+            handles.push(tokio::spawn(async move {
+                run_single_path_loop(app, &url, &path_id, upstream.as_ref(), child_cancel).await;
+            }));
+        }
+    } else {
+        let shards = libproxybase::network::seller_protocol::shard_paths(&paths, 16);
+        for (idx, shard) in shards.into_iter().enumerate() {
+            let tunnel_id = format!("tunnel_{}", idx);
+            let app = app_handle.clone();
+            let url = base_url.clone();
+            let child_cancel = cancel.clone();
+            handles.push(tokio::spawn(async move {
+                run_multiplexed_tunnel_loop(app, &url, &tunnel_id, shard, child_cancel).await;
+            }));
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
     }
 
     // Wait for external shutdown signal before stopping children
@@ -593,6 +608,347 @@ async fn try_single_path_connection<R: tauri::Runtime + 'static>(
                                         &tip,
                                         tport,
                                         up_cloned.as_ref(),
+                                        &tx_cloned,
+                                        tcp_rx,
+                                        &sid_cloned,
+                                    ).await;
+
+                                    active_cloned.lock().await.remove(&sid_cloned);
+                                    if !sid_cloned.starts_with("probe_") {
+                                        let _ = app_cloned.emit("seller:stream-closed", &sid_cloned);
+                                    }
+                                });
+                                relay_tasks.push(handle);
+                            }
+                            _ => {}
+                        }
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        let _ = relay_tx.send(Message::Pong(payload));
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(Message::Close(_))) | None => {
+                        abort_path_tasks(&relay_drain, &relay_tasks);
+                        return Ok(());
+                    }
+                    Some(Err(e)) => {
+                        abort_path_tasks(&relay_drain, &relay_tasks);
+                        return Err(format!("WS read error: {}", e));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+async fn run_multiplexed_tunnel_loop<R: tauri::Runtime + 'static>(
+    app_handle: AppHandle<R>,
+    backend_url: &str,
+    tunnel_id: &str,
+    paths: Vec<(String, Option<UpstreamProxy>)>,
+    shutdown: CancellationToken,
+) {
+    let path_map: Arc<HashMap<String, Option<UpstreamProxy>>> =
+        Arc::new(paths.into_iter().collect());
+    let path_ids: Vec<String> = path_map.keys().cloned().collect();
+    let tid = tunnel_id.to_string();
+    let mut backoff_secs = 1u64;
+
+    loop {
+        let client = BackendClient::new(backend_url);
+        let token = client.token().unwrap_or("").to_string();
+        let ws_base = backend_url
+            .replace("https://", "wss://")
+            .replace("http://", "ws://");
+        let ws_url = format!(
+            "{}/v2/ws/seller?token={}",
+            ws_base,
+            percent_encode(&token)
+        );
+
+        let app = app_handle.clone();
+        let p_map = path_map.clone();
+        let p_ids = path_ids.clone();
+        let t = tid.clone();
+        let cancel = shutdown.clone();
+
+        match try_multiplexed_tunnel_connection(
+            app.clone(),
+            &ws_url,
+            &token,
+            &t,
+            &p_ids,
+            p_map.clone(),
+            cancel,
+        )
+        .await
+        {
+            Ok(()) => {
+                backoff_secs = 1;
+                let _ = app.emit(
+                    "seller:disconnected",
+                    format!("[{}] Multiplexed tunnel disconnected. Reconnecting...", t),
+                );
+            }
+            Err(e) if e.contains("AUTH_EXPIRED") || e.contains("401") => {
+                let _ = app.emit(
+                    "seller:reconnecting",
+                    format!("[{}] Token expired. Re-authenticating...", t),
+                );
+                let reauth_result = crate::commands::reauth(backend_url).await;
+                if reauth_result.is_ok() {
+                    backoff_secs = 1;
+                    let _ = app.emit("seller:connected", format!("[{}] Re-authenticated", t));
+                } else {
+                    let err = reauth_result.unwrap_err();
+                    let msg = if err.contains("wrong password") || err.contains("Failed to load wallet") {
+                        let _ = app.emit("seller:needs-password", &t);
+                        format!(
+                            "[{}] Wallet password required — enter password in app and restart seller",
+                            t
+                        )
+                    } else {
+                        format!("[{}] Re-auth failed: {}", t, err)
+                    };
+                    let _ = app.emit("seller:error", &msg);
+                    tokio::select! {
+                        _ = shutdown.cancelled() => return,
+                        _ = tokio::time::sleep(jittered_backoff(backoff_secs)) => {}
+                    }
+                    backoff_secs = (backoff_secs * 2).min(60);
+                }
+            }
+            Err(e) if e.contains("MULTIPLEX_UNSUPPORTED") => {
+                let _ = app.emit(
+                    "seller:reconnecting",
+                    format!(
+                        "[{}] Multiplexing unsupported by backend — falling back to single-path connections",
+                        t
+                    ),
+                );
+                let mut fallback_handles = Vec::new();
+                for (path_id, upstream) in path_map.iter() {
+                    let a = app.clone();
+                    let u = upstream.clone();
+                    let p = path_id.clone();
+                    let b = backend_url.to_string();
+                    let c = shutdown.clone();
+                    fallback_handles.push(tokio::spawn(async move {
+                        run_single_path_loop(a, &b, &p, u.as_ref(), c).await;
+                    }));
+                }
+                for handle in &mut fallback_handles {
+                    let _ = handle.await;
+                }
+                return;
+            }
+            Err(e) => {
+                let _ = app.emit(
+                    "seller:error",
+                    format!("[{}] {} — retrying in {}s", t, e, backoff_secs),
+                );
+                tokio::select! {
+                    _ = shutdown.cancelled() => return,
+                    _ = tokio::time::sleep(jittered_backoff(backoff_secs)) => {}
+                }
+                backoff_secs = (backoff_secs * 2).min(60);
+            }
+        }
+
+        tokio::select! {
+            _ = shutdown.cancelled() => return,
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {}
+        }
+    }
+}
+
+async fn try_multiplexed_tunnel_connection<R: tauri::Runtime + 'static>(
+    app_handle: AppHandle<R>,
+    ws_url: &str,
+    token: &str,
+    tunnel_id: &str,
+    path_ids: &[String],
+    path_map: Arc<HashMap<String, Option<UpstreamProxy>>>,
+    shutdown: CancellationToken,
+) -> Result<(), String> {
+    if token.is_empty() {
+        return Err("No session token — please login first.".to_string());
+    }
+
+    let (ws, _) = tokio::time::timeout(Duration::from_secs(15), connect_async(ws_url))
+        .await
+        .map_err(|_| format!("WS connect {}: timed out after 15s", ws_url))?
+        .map_err(|e| format!("WS connect {}: {}", ws_url, e))?;
+
+    let (mut ws_sink, mut ws_stream) = ws.split();
+
+    // 1. Send auth token
+    ws_sink
+        .send(Message::Text(token.to_string().into()))
+        .await
+        .map_err(|e| format!("Send auth: {}", e))?;
+
+    // 2. Send register_multiplex
+    let reg_msg = serde_json::json!({
+        "type": "register_multiplex",
+        "tunnel_id": tunnel_id,
+        "paths": path_ids,
+    });
+    ws_sink
+        .send(Message::Text(
+            serde_json::to_string(&reg_msg).unwrap_or_default().into(),
+        ))
+        .await
+        .map_err(|e| format!("Send register_multiplex: {}", e))?;
+
+    // Wait up to 3s for register_multiplex_ack
+    let mut ack_received = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+    while tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout(Duration::from_secs(1), ws_stream.next()).await {
+            Ok(Some(Ok(Message::Text(txt)))) => {
+                if let Ok(p) = serde_json::from_str::<serde_json::Value>(&txt) {
+                    if p.get("type").and_then(|v| v.as_str()) == Some("register_multiplex_ack") {
+                        ack_received = true;
+                        break;
+                    } else if p.get("error").and_then(|v| v.as_str()) == Some("invalid_token") {
+                        return Err("AUTH_EXPIRED".to_string());
+                    }
+                }
+            }
+            Ok(Some(Ok(Message::Ping(data)))) => {
+                let _ = ws_sink.send(Message::Pong(data)).await;
+            }
+            Ok(Some(Ok(_))) => {}
+            _ => {}
+        }
+    }
+
+    if !ack_received {
+        return Err("MULTIPLEX_UNSUPPORTED".to_string());
+    }
+
+    let _ = app_handle.emit(
+        "seller:connected",
+        format!(
+            "[{}] Multiplexed tunnel connected ({} paths)",
+            tunnel_id,
+            path_ids.len()
+        ),
+    );
+
+    let (relay_tx, mut relay_rx) = mpsc::unbounded_channel::<Message>();
+    let active: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<Vec<u8>>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+
+    let relay_drain = tokio::spawn(async move {
+        while let Some(msg) = relay_rx.recv().await {
+            if ws_sink.send(msg).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    let mut relay_tasks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
+    let mut ping_tick = tokio::time::interval(Duration::from_secs(20));
+    let mut heartbeat_tick = tokio::time::interval(Duration::from_secs(15));
+    let mut watchdog = tokio::time::interval_at(
+        tokio::time::Instant::now() + Duration::from_secs(90),
+        Duration::from_secs(90),
+    );
+    const MAX_STREAMS: usize = 2000;
+
+    loop {
+        tokio::select! {
+            _ = shutdown.cancelled() => {
+                abort_path_tasks(&relay_drain, &relay_tasks);
+                return Ok(());
+            }
+            _ = watchdog.tick() => {
+                abort_path_tasks(&relay_drain, &relay_tasks);
+                return Err("Connection watchdog: no message in 90s".to_string());
+            }
+            _ = ping_tick.tick() => {
+                let _ = relay_tx.send(Message::Ping(vec![].into()));
+            }
+            _ = heartbeat_tick.tick() => {
+                let count = active.lock().await.len() as u32;
+                let hb = serde_json::json!({
+                    "type": "multiplex_heartbeat",
+                    "tunnel_id": tunnel_id,
+                    "active_streams": count,
+                    "version": "0.1.0"
+                });
+                let _ = relay_tx.send(Message::Text(serde_json::to_string(&hb).unwrap_or_default().into()));
+            }
+            msg = ws_stream.next() => {
+                watchdog.reset();
+                match msg {
+                    Some(Ok(Message::Text(text))) => {
+                        let p: serde_json::Value = match serde_json::from_str(&text) {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        if p.get("error").and_then(|v| v.as_str()) == Some("invalid_token") {
+                            abort_path_tasks(&relay_drain, &relay_tasks);
+                            return Err("AUTH_EXPIRED".to_string());
+                        }
+                        match p.get("type").and_then(|v| v.as_str()) {
+                            Some("relay_data") => {
+                                if let Some(enc) = p.get("data").and_then(|v| v.as_str()) {
+                                    if let Some(dec) = base64_decode(enc) {
+                                        let streams = active.lock().await;
+                                        let sid = p.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+                                        if let Some(s) = streams.get(sid) {
+                                            let _ = s.send(dec);
+                                        }
+                                    }
+                                }
+                            }
+                            Some("stream_close") => {
+                                let sid = p.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+                                active.lock().await.remove(sid);
+                            }
+                            Some("stream_open") => {
+                                if active.lock().await.len() >= MAX_STREAMS {
+                                    continue;
+                                }
+                                let sid = p.get("session_id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
+                                let tip = p.get("target_ip").and_then(|v| v.as_str()).unwrap_or("127.0.0.1").to_string();
+                                let tport = p.get("target_port").and_then(|v| v.as_u64()).unwrap_or(443) as u16;
+                                let thost = p.get("target_host").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                let path_id = p.get("path_id").and_then(|v| v.as_str()).unwrap_or("direct");
+                                let dest = thost.unwrap_or_else(|| tip.clone());
+
+                                let (tcp_tx, tcp_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+                                active.lock().await.insert(sid.clone(), tcp_tx);
+
+                                if !sid.starts_with("probe_") {
+                                    let _ = app_handle.emit(
+                                        "seller:stream-open",
+                                        StreamEvent {
+                                            session_id: sid.clone(),
+                                            target_ip: tip.clone(),
+                                            target_port: tport,
+                                            route_index: None,
+                                        },
+                                    );
+                                }
+
+                                let upstream_opt = path_map.get(path_id).cloned().flatten();
+                                let app_cloned = app_handle.clone();
+                                let sid_cloned = sid.clone();
+                                let active_cloned = active.clone();
+                                let tx_cloned = relay_tx.clone();
+
+                                let handle = tokio::spawn(async move {
+                                    run_stream_relay(
+                                        app_cloned.clone(),
+                                        &dest,
+                                        &tip,
+                                        tport,
+                                        upstream_opt.as_ref(),
                                         &tx_cloned,
                                         tcp_rx,
                                         &sid_cloned,
