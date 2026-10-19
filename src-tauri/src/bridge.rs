@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
@@ -36,11 +37,102 @@ struct Bridge {
     shutdown_tx: tokio::sync::oneshot::Sender<()>,
     task: tokio::task::JoinHandle<()>,
     local_port: u16,
+    upstream_addr: String,
+    /// `ip:port` resolved before the tunnel installed fake-IP DNS. Dialing the
+    /// hostname after routes are up would resolve to 198.18.x.y and loop back
+    /// into the tunnel.
+    upstream_dial_addr: String,
 }
 
 /// Global registry of active bridges, keyed by session_id.
 static BRIDGES: std::sync::LazyLock<Arc<Mutex<HashMap<String, Bridge>>>> =
     std::sync::LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
+
+/// Real relay IPs observed before the tunnel was active, keyed by hostname.
+/// Bridges started later (while fake DNS is answering) reuse these.
+static RELAY_IP_CACHE: std::sync::LazyLock<std::sync::Mutex<HashMap<String, IpAddr>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
+fn split_upstream(upstream_addr: &str) -> Option<(String, u16)> {
+    let authority = upstream_addr.trim();
+    let authority = authority
+        .strip_prefix("socks5h://")
+        .or_else(|| authority.strip_prefix("socks5://"))
+        .or_else(|| authority.strip_prefix("socks4://"))
+        .or_else(|| authority.strip_prefix("http://"))
+        .or_else(|| authority.strip_prefix("https://"))
+        .unwrap_or(authority)
+        .split('/')
+        .next()?;
+    if let Some(rest) = authority.strip_prefix('[') {
+        let (host, tail) = rest.split_once(']')?;
+        let port = tail.strip_prefix(':')?.parse().ok()?;
+        return Some((host.to_string(), port));
+    }
+    let (host, port) = authority.rsplit_once(':')?;
+    Some((host.to_string(), port.parse().ok()?))
+}
+
+fn fake_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let o = v4.octets();
+            o[0] == 198 && (o[1] == 18 || o[1] == 19)
+        }
+        IpAddr::V6(_) => false,
+    }
+}
+
+/// Resolve the upstream relay to a literal `ip:port` while real DNS is still
+/// available. Called only when creating a bridge, before the tunnel starts.
+pub async fn resolve_upstream_dial(upstream_addr: &str) -> Result<String, String> {
+    let (host, port) = split_upstream(upstream_addr)
+        .ok_or_else(|| format!("invalid upstream address {upstream_addr:?} (expected host:port)"))?;
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        if !fake_ip(ip) {
+            if let Ok(mut cache) = RELAY_IP_CACHE.lock() {
+                cache.insert(host, ip);
+            }
+            return Ok(format!("{}:{}", bracket(ip), port));
+        }
+    }
+    if let Ok(cache) = RELAY_IP_CACHE.lock() {
+        if let Some(ip) = cache.get(&host) {
+            return Ok(format!("{}:{}", bracket(*ip), port));
+        }
+    }
+    let addrs = tokio::net::lookup_host((host.as_str(), port))
+        .await
+        .map_err(|e| format!("cannot resolve relay {host}: {e}"))?;
+    let mut fallback: Option<IpAddr> = None;
+    for addr in addrs {
+        let ip = addr.ip();
+        fallback.get_or_insert(ip);
+        if ip.is_ipv4() && !fake_ip(ip) {
+            if let Ok(mut cache) = RELAY_IP_CACHE.lock() {
+                cache.insert(host.clone(), ip);
+            }
+            return Ok(format!("{}:{}", bracket(ip), port));
+        }
+    }
+    let ip = fallback.ok_or_else(|| format!("relay {host} resolved to no addresses"))?;
+    if fake_ip(ip) {
+        return Err(format!(
+            "relay {host} resolved to a fake tunnel address; start the tunnel only after the bridge is running"
+        ));
+    }
+    if let Ok(mut cache) = RELAY_IP_CACHE.lock() {
+        cache.insert(host, ip);
+    }
+    Ok(format!("{}:{}", bracket(ip), port))
+}
+
+fn bracket(ip: IpAddr) -> String {
+    match ip {
+        IpAddr::V4(v4) => v4.to_string(),
+        IpAddr::V6(v6) => format!("[{v6}]"),
+    }
+}
 
 /// Start a local unauthenticated SOCKS5 bridge for a session.
 /// Returns the local port the bridge is listening on.
@@ -56,6 +148,17 @@ pub async fn start_bridge(
     // benefit — the upstream token is already reloaded on every connection.
     // The lock is held across bind+insert so two concurrent starts for the
     // same session can never both bind and orphan a listener.
+    // Idempotent fast path: never re-resolve while a healthy bridge exists
+    // (after the tunnel is up, hostname resolution returns fake addresses).
+    {
+        let bridges = BRIDGES.lock().await;
+        if let Some(bridge) = bridges.get(&session_id) {
+            return Ok(bridge.local_port);
+        }
+    }
+
+    let upstream_dial_addr = resolve_upstream_dial(&upstream_addr).await?;
+
     let mut bridges = BRIDGES.lock().await;
     if let Some(bridge) = bridges.get(&session_id) {
         return Ok(bridge.local_port);
@@ -100,6 +203,8 @@ pub async fn start_bridge(
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
     let sid = session_id.clone();
+    let upstream_for_tunnel = upstream_addr.clone();
+    let dial_for_task = upstream_dial_addr.clone();
     let task = tokio::spawn(async move {
         eprintln!("[bridge {}] Started on port {}", sid, local_port);
 
@@ -112,7 +217,7 @@ pub async fn start_bridge(
                 result = listener.accept() => {
                     match result {
                         Ok((client_stream, client_addr)) => {
-                            let up_addr = upstream_addr.clone();
+                            let up_addr = dial_for_task.clone();
                             let up_user = upstream_username.clone();
                             // Dynamically reload token on every connection so
                             // re-auth'd tokens propagate to the bridge instantly.
@@ -143,6 +248,8 @@ pub async fn start_bridge(
             shutdown_tx,
             task,
             local_port,
+            upstream_addr: upstream_for_tunnel,
+            upstream_dial_addr,
         },
     );
 
@@ -176,6 +283,16 @@ async fn bridge_port_inner(session_id: &str) -> Option<u16> {
     bridges.get(session_id).map(|b| b.local_port)
 }
 
+/// Local port plus the upstream relay host used by this session's bridge.
+/// The tunnel daemon needs the resolved relay IP so it can pin a host route
+/// outside the TUN adapter.
+pub async fn bridge_info(session_id: &str) -> Option<(u16, String, String)> {
+    let bridges = BRIDGES.lock().await;
+    bridges
+        .get(session_id)
+        .map(|b| (b.local_port, b.upstream_addr.clone(), b.upstream_dial_addr.clone()))
+}
+
 /// Relay a client connection through the authenticated upstream SOCKS5 proxy.
 async fn relay_through_upstream(
     mut client: tokio::net::TcpStream,
@@ -194,6 +311,7 @@ async fn relay_through_upstream(
         Ok(Ok(t)) => t,
         Ok(Err(e)) => {
             eprintln!("Bridge SOCKS5 handshake failed: {}", e);
+            let _ = send_socks5_reply(&mut client, 0x01).await;
             return;
         }
         Err(_) => {
@@ -224,13 +342,22 @@ async fn relay_through_upstream(
         Ok(Ok(s)) => s,
         Ok(Err(e)) => {
             eprintln!("Bridge upstream connect failed: {:?}", e);
+            let _ = send_socks5_reply(&mut client, upstream_reply_code(&e)).await;
             return;
         }
         Err(_) => {
             eprintln!("Bridge upstream connect timed out");
+            let _ = send_socks5_reply(&mut client, 0x06).await;
             return;
         }
     };
+
+    // Only report success once the upstream SOCKS5 session is established.
+    // This lets the tunnel distinguish "proxy accepted" from "session quota
+    // exhausted / lease revoked" instead of seeing a bare EOF.
+    if send_socks5_reply(&mut client, 0x00).await.is_err() {
+        return;
+    }
 
     let (mut up_r, mut up_w) = tokio::io::split(upstream);
     let (mut cl_r, mut cl_w) = tokio::io::split(client);
@@ -397,17 +524,32 @@ async fn accept_socks5_noauth(
         .map_err(|e| format!("read port: {}", e))?;
     let port = u16::from_be_bytes(port_bytes);
 
-    // Send success reply
-    let reply = [
-        0x05, 0x00, 0x00, 0x01, // VER, REP, RSV, ATYP
-        0x00, 0x00, 0x00, 0x00, // BND.ADDR (0.0.0.0)
-        (port >> 8) as u8,       // BND.PORT hi
-        (port & 0xFF) as u8,     // BND.PORT lo
-    ];
-    client
-        .write_all(&reply)
-        .await
-        .map_err(|e| format!("write reply: {}", e))?;
-
     Ok((host, port))
+}
+
+/// Send a SOCKS5 reply with a zero bound address. Called only after the
+/// upstream connection has succeeded (0x00) or to propagate a failure.
+async fn send_socks5_reply(
+    client: &mut tokio::net::TcpStream,
+    rep: u8,
+) -> std::io::Result<()> {
+    let reply = [
+        0x05, rep, 0x00, 0x01, // VER, REP, RSV, ATYP
+        0x00, 0x00, 0x00, 0x00, // BND.ADDR (0.0.0.0)
+        0x00, 0x00, // BND.PORT
+    ];
+    client.write_all(&reply).await
+}
+
+fn upstream_reply_code(error: &fast_socks5::SocksError) -> u8 {
+    use fast_socks5::SocksError as E;
+    match error {
+        E::ReplyError(reply) => (*reply).as_u8(),
+        // A rejected username/password or session token means the purchased
+        // lease is no longer valid.
+        E::AuthenticationRejected(_) | E::AuthMethodUnacceptable(_) => 0x02,
+        E::Io(io) if io.kind() == std::io::ErrorKind::ConnectionRefused => 0x05,
+        E::Io(io) if io.kind() == std::io::ErrorKind::TimedOut => 0x06,
+        _ => 0x01,
+    }
 }

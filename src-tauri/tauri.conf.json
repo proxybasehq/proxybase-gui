@@ -4,9 +4,9 @@
   "version": "0.1.81",
   "identifier": "xyz.proxybase.desktop",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm sidecar:debug && pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm build && pnpm sidecar:release",
     "frontendDist": "../dist"
   },
   "app": {

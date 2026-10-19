@@ -227,3 +227,68 @@ export async function bridgeStop(sessionId: string): Promise<void> {
 export async function bridgePort(sessionId: string): Promise<number | null> {
   return invoke("bridge_port", { sessionId });
 }
+
+// ---- System tunnel (VPN mode) ----
+
+export type TunnelMode = "layer3_tun" | "os_system_proxy_fallback";
+
+export type TunnelState =
+  | { status: "disconnected" }
+  | { status: "requesting_privileges" }
+  | { status: "configuring_routes"; proxy_id: string }
+  | { status: "verifying_exit_node"; proxy_id: string }
+  | {
+      status: "connected";
+      proxy_id: string;
+      exit_ip: string;
+      country_code?: string | null;
+      isp?: string | null;
+      latency_ms: number;
+      connected_since_unix: number;
+      mode: TunnelMode;
+    }
+  | { status: "reconnecting"; proxy_id: string; attempt: number; last_error: string }
+  | { status: "disconnecting" }
+  | { status: "error"; code: string; message: string };
+
+export interface TunnelTelemetry {
+  rx_bytes_total: number;
+  tx_bytes_total: number;
+  rx_bps: number;
+  tx_bps: number;
+  active_flows: number;
+}
+
+export interface TunnelEnableOptions {
+  killSwitch?: boolean;
+  bypassCidrs?: string[];
+  disableQuicUdp443?: boolean;
+  blockWebrtcStun?: boolean;
+  stopOnGuiExit?: boolean;
+}
+
+export async function enableSystemTunnel(
+  proxyId: string,
+  options: TunnelEnableOptions = {}
+): Promise<TunnelState> {
+  return invoke("enable_system_tunnel", {
+    proxyId,
+    killSwitch: options.killSwitch ?? null,
+    bypassCidrs: options.bypassCidrs ?? null,
+    disableQuicUdp443: options.disableQuicUdp443 ?? null,
+    blockWebrtcStun: options.blockWebrtcStun ?? null,
+    stopOnGuiExit: options.stopOnGuiExit ?? null,
+  });
+}
+
+export async function disableSystemTunnel(): Promise<TunnelState> {
+  return invoke("disable_system_tunnel");
+}
+
+export async function getSystemTunnelStatus(): Promise<TunnelState> {
+  return invoke("get_system_tunnel_status");
+}
+
+export async function getTunnelTelemetry(): Promise<TunnelTelemetry> {
+  return invoke("get_tunnel_telemetry");
+}

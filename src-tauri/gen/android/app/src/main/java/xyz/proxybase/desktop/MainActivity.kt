@@ -16,7 +16,13 @@ class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        VpnController.attach(this)
         startSellerService()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        VpnController.onActivityResult(requestCode, resultCode)
     }
 
     override fun onDestroy() {

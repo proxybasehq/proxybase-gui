@@ -739,3 +739,53 @@ tr:hover td {
     min-width: 44px;
   }
 }
+
+/* ---- System tunnel banner ---- */
+.tunnel-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 12px;
+  background: #171717;
+  color: #fafafa;
+  font-size: 12px;
+  border-bottom: 1px solid #262626;
+}
+.tunnel-banner-error {
+  background: #3b1212;
+  border-bottom-color: #5b1a1a;
+}
+.tunnel-banner-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.tunnel-banner-title {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tunnel-banner-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #a3a3a3;
+  flex-wrap: wrap;
+}
+.tunnel-banner-error-text {
+  color: #fca5a5;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tunnel-mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+.tunnel-banner-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}

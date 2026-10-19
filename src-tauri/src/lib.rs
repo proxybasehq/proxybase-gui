@@ -1,12 +1,22 @@
 mod api;
 pub mod bridge;
 mod commands;
+#[path = "commands/tunnel.rs"]
+mod tunnel_commands;
+#[cfg(desktop)]
+pub mod tunnel_client;
+#[cfg(target_os = "android")]
+mod android_vpn_jni;
 pub mod seller;
 
+#[cfg(desktop)]
+use libproxybase::tunnel::TunnelState;
 use seller::SellerState;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+#[cfg(desktop)]
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
 #[cfg(desktop)]
 use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
@@ -98,9 +108,73 @@ pub fn run() {
                 if let Some(icon) = _app.default_window_icon() {
                     let vis = window_visible.clone();
                     let icon_cloned = icon.clone();
+
+                    let tunnel_status = MenuItemBuilder::with_id(
+                        "tunnel_status",
+                        "System tunnel: disconnected",
+                    )
+                    .enabled(false)
+                    .build(_app)?;
+                    let tunnel_disconnect = MenuItemBuilder::with_id(
+                        "tunnel_disconnect",
+                        "Disconnect System Tunnel",
+                    )
+                    .build(_app)?;
+                    let show_item =
+                        MenuItemBuilder::with_id("show_window", "Show ProxyBase").build(_app)?;
+                    let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(_app)?;
+                    let tray_menu = MenuBuilder::new(_app)
+                        .items(&[&tunnel_status, &tunnel_disconnect])
+                        .separator()
+                        .items(&[&show_item, &quit_item])
+                        .build()?;
+
+                    // Keep the tray label in sync without waking the daemon
+                    // more than necessary.
+                    {
+                        let label = tunnel_status.clone();
+                        tauri::async_runtime::spawn(async move {
+                            loop {
+                                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                                let state = tunnel_client::status()
+                                    .await
+                                    .unwrap_or(TunnelState::Disconnected);
+                                let text = match state {
+                                    TunnelState::Disconnected => {
+                                        "System tunnel: disconnected".to_string()
+                                    }
+                                    TunnelState::Connected { exit_ip, .. } => {
+                                        format!("System tunnel: connected ({exit_ip})")
+                                    }
+                                    TunnelState::Error { message, .. } => {
+                                        format!("System tunnel: error — {message}")
+                                    }
+                                    _ => "System tunnel: connecting…".to_string(),
+                                };
+                                let _ = label.set_text(text);
+                            }
+                        });
+                    }
+
                     let _ = TrayIconBuilder::new()
                         .icon(icon_cloned)
+                        .menu(&tray_menu)
                         .show_menu_on_left_click(false)
+                        .on_menu_event(|app, event| match event.id().as_ref() {
+                            "show_window" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                            "tunnel_disconnect" => {
+                                tauri::async_runtime::spawn(async move {
+                                    let _ = tunnel_client::stop().await;
+                                });
+                            }
+                            "quit" => app.exit(0),
+                            _ => {}
+                        })
                         .on_tray_icon_event(move |tray, event| {
                             let app = tray.app_handle();
                             tauri_plugin_positioner::on_tray_event(app, &event);
@@ -144,6 +218,9 @@ pub fn run() {
             // webview stops responding while its window is visible (a known
             // failure after system sleep/hibernation), reload it automatically
             // instead of forcing the user to kill and restart the process.
+            #[cfg(desktop)]
+            tunnel_client::init(_app.handle().clone());
+
             _app.manage(UiWatchdog::new());
             {
                 let wd_app = _app.handle().clone();
@@ -213,6 +290,10 @@ pub fn run() {
             bridge::bridge_start,
             bridge::bridge_stop,
             bridge::bridge_port,
+            tunnel_commands::enable_system_tunnel,
+            tunnel_commands::disable_system_tunnel,
+            tunnel_commands::get_system_tunnel_status,
+            tunnel_commands::get_tunnel_telemetry,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -90,3 +90,26 @@ The full design spec is in `design/design.md`. It defines a Vercel-inspired desi
 - **Spacing**: 4px base unit. Section padding 64-96px. Content max-width ~1400px.
 
 Read `design/design.md` before implementing any UI — treat it as the source of truth for visual decisions.
+
+## System-wide tunnel (VPN mode)
+
+One-click routing of all OS traffic through a purchased session. The full
+design is documented in `docs/system-tunnel.md`.
+
+- **Shared engine**: `libproxybase::tunnel` (Fake-IP DNS, userspace TCP/IP,
+  MSS clamp, QUIC/STUN filtering, SOCKS5 relay, journal).
+- **Privileged daemon**: `crates/proxybase-tunneld`. Runs as root/LocalSystem,
+  owns TUN/routes/DNS, authenticates the GUI over
+  `/var/run/proxybase-tunneld.sock` / `\\.\pipe\proxybase-tunneld`.
+- **GUI client**: `src-tauri/src/tunnel_client.rs` + `src-tauri/src/commands/tunnel.rs`.
+- **Android**: `ProxyBaseVpnService.kt` + `VpnController.kt` hand a detached
+  `VpnService` fd to `src-tauri/src/android_vpn_jni.rs`; no daemon.
+- **UI**: `src/components/tunnel/*`, `src/hooks/useSystemTunnel.ts`; banner is
+  mounted in `Layout`, toggle in the Market sessions table/modal.
+- **Build**: `scripts/prepare-sidecar.mjs` builds and copies
+  `proxybase-tunneld` into `src-tauri/binaries/` for Tauri `externalBin`.
+  Desktop-only `externalBin`/Wintun resources live in
+  `tauri.{macos,linux,windows}.conf.json`. Vendor signed
+  `resources/wintun/{amd64,arm64}/wintun.dll` before Windows builds.
+- **Commands**: `cargo test -p libproxybase tunnel::`,
+  `cargo test -p proxybase-tunneld`, `pnpm tauri dev`.

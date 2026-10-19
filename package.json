@@ -16,7 +16,9 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "version-sync": "node scripts/sync-version.mjs"
+    "version-sync": "node scripts/sync-version.mjs",
+    "sidecar:debug": "node scripts/prepare-sidecar.mjs debug",
+    "sidecar:release": "node scripts/prepare-sidecar.mjs release"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

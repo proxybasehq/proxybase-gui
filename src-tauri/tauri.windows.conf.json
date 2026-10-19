@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "externalBin": [
+      "binaries/proxybase-tunneld"
+    ],
+    "resources": [
+      "resources/wintun"
+    ]
+  }
+}

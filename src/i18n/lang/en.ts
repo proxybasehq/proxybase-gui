@@ -339,6 +339,41 @@ const en = {
     "Choose the language used throughout the app. By default it follows your system language.",
   "settings.followSystem": "Follow system language",
   "settings.systemLangLabel": "System ({lang})",
+  // System tunnel (VPN mode)
+  "tunnel.column": "Tunnel",
+  "tunnel.enable": "Tunnel System Traffic",
+  "tunnel.active": "Tunnel Active",
+  "tunnel.switchHere": "Switch Tunnel Here",
+  "tunnel.connecting": "Connecting...",
+  "tunnel.connected": "System Tunnel Active",
+  "tunnel.error": "System Tunnel Error",
+  "tunnel.reconnecting": "Tunnel Reconnecting...",
+  "tunnel.disconnecting": "Disconnecting...",
+  "tunnel.pleaseWait": "Please wait...",
+  "tunnel.disconnect": "Disconnect",
+  "tunnel.topUp": "Top Up Data",
+  "tunnel.settings": "Settings",
+  "tunnel.flows": "{count} flows",
+  "tunnel.settingsTitle": "System Tunnel Settings",
+  "tunnel.settingsDesc":
+    "These options apply the next time the tunnel connects. Traffic from every application is routed through the selected proxy.",
+  "tunnel.killSwitch": "Kill switch",
+  "tunnel.killSwitchDesc":
+    "Keep all traffic blocked if the proxy disconnects unexpectedly, preventing leaks.",
+  "tunnel.quic": "Disable QUIC (UDP 443)",
+  "tunnel.quicDesc":
+    "Reject HTTP/3 immediately so browsers fall back to HTTP/2 instead of waiting for a QUIC timeout.",
+  "tunnel.stun": "Block WebRTC STUN",
+  "tunnel.stunDesc":
+    "Drop STUN packets so websites cannot discover your physical IP address through WebRTC.",
+  "tunnel.stopOnExit": "Disconnect when ProxyBase quits",
+  "tunnel.stopOnExitDesc":
+    "Tear the tunnel down if the GUI process exits or crashes.",
+  "tunnel.bypass": "Split-tunnel exceptions",
+  "tunnel.bypassDesc":
+    "One CIDR per line. Private LAN ranges are always excluded automatically.",
+  "tunnel.appliesNext": "Changes apply the next time the tunnel connects.",
+
 };
 
 export default en;

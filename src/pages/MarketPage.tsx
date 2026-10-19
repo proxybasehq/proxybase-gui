@@ -9,6 +9,8 @@ import { CountryFlag } from "../components/CountryFlag";
 import { CountrySelect } from "../components/CountrySelect";
 import { track, TrackEvent } from "../tracking";
 import { useI18n } from "../i18n";
+import TunnelToggleButton from "../components/tunnel/TunnelToggleButton";
+import TunnelSettingsModal from "../components/tunnel/TunnelSettingsModal";
 
 // View-only mappings: system types stay untouched, only the rendered text
 // changes. Cross-platform font stack supporting Twemoji, Apple, Segoe UI, and Noto emojis.
@@ -56,6 +58,7 @@ export default function MarketPage() {
   const [error, setError] = useState("");
   const [insufficientFunds, setInsufficientFunds] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [showTunnelSettings, setShowTunnelSettings] = useState(false);
 
   async function copyToClipboard(value: string, label: string) {
     try {
@@ -638,7 +641,11 @@ export default function MarketPage() {
               </div>
             )}
 
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: (connectModal as any).session_type === "sticky" ? "var(--space-xs)" : "var(--space-md)", width: "100%" }} onClick={() => { setConnectModal(null); setRotateSuccess(null); }}>{t("common.close")}</button>
+            <div style={{ marginTop: (connectModal as any).session_type === "sticky" ? "var(--space-xs)" : "var(--space-md)" }}>
+              <TunnelToggleButton proxyId={(connectModal as any).session_id} className="btn-block" />
+            </div>
+
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-xs)", width: "100%" }} onClick={() => { setConnectModal(null); setRotateSuccess(null); }}>{t("common.close")}</button>
           </div>
         </div>
       )}
@@ -780,7 +787,17 @@ export default function MarketPage() {
       {/* ---- Active Sessions Tab ---- */}
       {activeTab === "sessions" && (
         <div className="card">
-          <div className="card-title" style={{ marginBottom: 0 }}>{t("market.activeSessionsCount", { count: sessions.length })}</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="card-title" style={{ marginBottom: 0 }}>{t("market.activeSessionsCount", { count: sessions.length })}</div>
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ padding: "0 8px", height: 24, fontSize: 11 }}
+              onClick={() => setShowTunnelSettings(true)}
+              title={t("tunnel.settingsTitle")}
+            >
+              {t("tunnel.settings")}
+            </button>
+          </div>
           {sessions.length === 0 ? (
             <p className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{t("market.noActiveSessions")}</p>
           ) : (
@@ -792,6 +809,7 @@ export default function MarketPage() {
                     <th>{t("market.type")}</th>
                     <th>{t("market.mode")}</th>
                     <th>{t("common.status")}</th>
+                    <th>{t("tunnel.column")}</th>
                     <th className="table-action" style={{ width: 68 }}></th>
                   </tr>
                 </thead>
@@ -806,6 +824,13 @@ export default function MarketPage() {
                       <td>{emojiBadge(TYPE_EMOJI, (s as any).network_type || (s as any).proxy_category)}</td>
                       <td>{emojiBadge(MODE_EMOJI, (s as any).session_type)}</td>
                       <td>{emojiBadge(STATUS_EMOJI, (s as any).status)}</td>
+                      <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
+                        {["active", "alive", "open"].includes(String((s as any).status)) ? (
+                          <TunnelToggleButton proxyId={(s as any).session_id} compact />
+                        ) : (
+                          <span className="text-muted" style={{ fontSize: 11 }}>—</span>
+                        )}
+                      </td>
                       <td className="table-action" onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
                         {(s as any).session_type === "sticky" && (s as any).status === "active" && (
                           <button
@@ -850,6 +875,7 @@ export default function MarketPage() {
         </div>
       )}
 
+      <TunnelSettingsModal open={showTunnelSettings} onClose={() => setShowTunnelSettings(false)} />
     </div>
   );
 }
