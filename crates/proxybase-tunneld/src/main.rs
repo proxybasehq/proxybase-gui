@@ -91,16 +91,15 @@ fn init_tracing() {
                     .map_err(|e| e.to_string())
             });
         if let Ok(appender) = appender {
-            let (writer, guard) = tracing_appender::non_blocking(appender);
+            // Write synchronously: the service must not lose its final error
+            // line when it calls process::exit immediately afterwards.
             let initialized = tracing_subscriber::fmt()
                 .with_env_filter(env_filter())
-                .with_writer(writer)
+                .with_writer(appender)
                 .with_ansi(false)
                 .try_init()
                 .is_ok();
             if initialized {
-                // The worker guard must live for the process lifetime.
-                std::mem::forget(guard);
                 return;
             }
         }

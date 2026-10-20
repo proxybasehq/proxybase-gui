@@ -69,6 +69,14 @@ fn run_service() -> anyhow::Result<()> {
         let engine = std::sync::Arc::new(libproxybase::tunnel::SystemTunnelEngine::new());
         let serve_engine = engine.clone();
         let serve = tokio::spawn(async move { crate::ipc_server::serve(serve_engine).await });
+        // The SCM requires an explicit StartPending -> Running transition;
+        // without it the service is killed with error 1053 after ~30 s and the
+        // installer times out waiting for the Running state.
+        status_handle.set_service_status(status(
+            ServiceState::Running,
+            ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN,
+            0,
+        ))?;
         let stop = tokio::task::spawn_blocking(move || {
             let _ = shutdown_rx.recv();
         });
@@ -193,7 +201,8 @@ fn copy_binary() -> anyhow::Result<PathBuf> {
 /// releasing its executable would make the following copy fail.
 fn wait_until_stopped(service: &Service) {
     const ERROR_SERVICE_DOES_NOT_EXIST: i32 = 1060;
-    for _ in 0..75 {
+    let mut terminated = false;
+    for attempt in 0..175 {
         match service.query_status() {
             Ok(status) if status.current_state == ServiceState::Stopped => return,
             Err(windows_service::Error::Winapi(e))
@@ -201,8 +210,35 @@ fn wait_until_stopped(service: &Service) {
             {
                 return
             }
-            _ => std::thread::sleep(Duration::from_millis(200)),
+            Ok(status) => {
+                // A service stuck in StartPending does not accept Stop, and
+                // the SCM would only kill it after its ~30 s startup timeout.
+                // This is our own service, so terminate it directly instead of
+                // blocking the installer.
+                if !terminated && attempt >= 75 {
+                    if let Some(pid) = status.process_id {
+                        terminate_process(pid);
+                    }
+                    terminated = true;
+                }
+            }
+            Err(_) => {}
         }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn terminate_process(pid: u32) {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+
+    let handle = unsafe { OpenProcess(PROCESS_TERMINATE, 0, pid) };
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = TerminateProcess(handle, 1);
+        CloseHandle(handle);
     }
 }
 
@@ -283,7 +319,8 @@ pub fn install(allowed_uid: Option<u32>, gui_path: Option<&std::path::Path>) -> 
 
     // Report startup failures now (the pipe server might never appear) instead
     // of leaving the GUI to poll for ten seconds and time out.
-    for _ in 0..100 {
+    let mut last_state = None;
+    for _ in 0..150 {
         match service.query_status() {
             Ok(status) if status.current_state == ServiceState::Running => return Ok(()),
             Ok(status) if status.current_state == ServiceState::Stopped => {
@@ -292,14 +329,17 @@ pub fn install(allowed_uid: Option<u32>, gui_path: Option<&std::path::Path>) -> 
                     status.exit_code
                 );
             }
-            Ok(_) => {}
+            Ok(status) => last_state = Some(status.current_state),
             Err(e) => {
                 create_error = Some(e);
             }
         }
         std::thread::sleep(Duration::from_millis(200));
     }
-    anyhow::bail!("ProxyBaseTunnelService did not reach the Running state: {create_error:?}")
+    anyhow::bail!(
+        "ProxyBaseTunnelService did not reach the Running state (last state: {last_state:?}): \
+         {create_error:?}"
+    )
 }
 
 pub fn uninstall() -> anyhow::Result<()> {
