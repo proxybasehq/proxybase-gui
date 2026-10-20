@@ -293,63 +293,61 @@ fn is_other_writable(_path: &std::path::Path) -> bool {
 #[cfg(windows)]
 const PIPE_SDDL: &str = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;IU)";
 
-/// Restrict a named-pipe handle to LocalSystem, Administrators and interactive
-/// users. Call before the first client can connect.
+/// Security attributes carrying the pipe DACL. The DACL must be supplied when
+/// the pipe instance is created: `CreateNamedPipeW` returns a handle with only
+/// GENERIC_READ/GENERIC_WRITE access, so a later `SetSecurityInfo` fails with
+/// ERROR_ACCESS_DENIED (no WRITE_DAC). Keep this value alive for the duration
+/// of `create_with_security_attributes_raw`.
 #[cfg(windows)]
-pub fn apply_pipe_dacl(handle: windows_sys::Win32::Foundation::HANDLE) -> std::io::Result<()> {
-    use std::ptr::null_mut;
-    use windows_sys::Win32::Foundation::LocalFree;
-    use windows_sys::Win32::Security::Authorization::{
-        ConvertStringSecurityDescriptorToSecurityDescriptorW, SetSecurityInfo, SDDL_REVISION_1,
-        SE_KERNEL_OBJECT,
-    };
-    use windows_sys::Win32::Security::{
-        GetSecurityDescriptorDacl, DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
-    };
+pub struct PipeSecurity {
+    descriptor: windows_sys::Win32::Security::PSECURITY_DESCRIPTOR,
+    attributes: windows_sys::Win32::Security::SECURITY_ATTRIBUTES,
+}
 
-    let mut sd: PSECURITY_DESCRIPTOR = null_mut();
-    let sddl: Vec<u16> = PIPE_SDDL.encode_utf16().chain(std::iter::once(0)).collect();
-    let ok = unsafe {
-        ConvertStringSecurityDescriptorToSecurityDescriptorW(
-            sddl.as_ptr(),
-            SDDL_REVISION_1,
-            &mut sd,
-            std::ptr::null_mut(),
-        )
-    };
-    if ok == 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let result = (|| {
-        let mut dacl_present = 0i32;
-        let mut dacl = std::ptr::null_mut();
-        let mut dacl_defaulted = 0i32;
-        let ok = unsafe {
-            GetSecurityDescriptorDacl(sd, &mut dacl_present, &mut dacl, &mut dacl_defaulted)
+#[cfg(windows)]
+impl PipeSecurity {
+    pub fn new() -> std::io::Result<Self> {
+        use windows_sys::Win32::Security::Authorization::{
+            ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
         };
-        if ok == 0 || dacl_present == 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        let status = unsafe {
-            SetSecurityInfo(
-                handle,
-                SE_KERNEL_OBJECT,
-                DACL_SECURITY_INFORMATION,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                dacl,
+
+        let mut descriptor = std::ptr::null_mut();
+        let sddl: Vec<u16> = PIPE_SDDL.encode_utf16().chain(std::iter::once(0)).collect();
+        let ok = unsafe {
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                sddl.as_ptr(),
+                SDDL_REVISION_1,
+                &mut descriptor,
                 std::ptr::null_mut(),
             )
         };
-        if status != 0 {
-            return Err(std::io::Error::from_raw_os_error(status as i32));
+        if ok == 0 {
+            return Err(std::io::Error::last_os_error());
         }
-        Ok(())
-    })();
-    unsafe {
-        LocalFree(sd);
+        Ok(Self {
+            descriptor,
+            attributes: windows_sys::Win32::Security::SECURITY_ATTRIBUTES {
+                nLength: std::mem::size_of::<windows_sys::Win32::Security::SECURITY_ATTRIBUTES>()
+                    as u32,
+                lpSecurityDescriptor: descriptor,
+                bInheritHandle: 0,
+            },
+        })
     }
-    result
+
+    /// Raw pointer suitable for `ServerOptions::create_with_security_attributes_raw`.
+    pub fn as_mut_ptr(&mut self) -> *mut std::ffi::c_void {
+        &mut self.attributes as *mut _ as *mut std::ffi::c_void
+    }
+}
+
+#[cfg(windows)]
+impl Drop for PipeSecurity {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::LocalFree(self.descriptor);
+        }
+    }
 }
 
 #[cfg(windows)]

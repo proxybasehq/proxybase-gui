@@ -359,7 +359,7 @@ async fn serve_windows(service: Arc<Service>) -> anyhow::Result<()> {
         // with ERROR_ACCESS_DENIED. The DACL + peer executable check are the
         // security boundary, not the instance count.
         options.reject_remote_clients(true);
-        let server = match options.create(PIPE_NAME) {
+        let server = match create_pipe_instance(&options) {
             Ok(server) => server,
             Err(e) => {
                 // A transient instance conflict must not kill the service:
@@ -369,15 +369,6 @@ async fn serve_windows(service: Arc<Service>) -> anyhow::Result<()> {
                 continue;
             }
         };
-        #[cfg(windows)]
-        {
-            use std::os::windows::io::AsRawHandle;
-            if let Err(e) = peer_auth::apply_pipe_dacl(server.as_raw_handle() as _) {
-                tracing::error!(error = %e, "could not restrict IPC pipe DACL; retrying");
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                continue;
-            }
-        }
         if let Err(e) = server.connect().await {
             // The client may have closed between open and connect.
             tracing::debug!(error = %e, "IPC pipe connect failed");
@@ -405,6 +396,20 @@ async fn serve_windows(service: Arc<Service>) -> anyhow::Result<()> {
             }
         });
     }
+}
+
+#[cfg(windows)]
+fn create_pipe_instance(
+    options: &tokio::net::windows::named_pipe::ServerOptions,
+) -> std::io::Result<tokio::net::windows::named_pipe::NamedPipeServer> {
+    // The DACL must be supplied at creation time: the handle returned by
+    // CreateNamedPipe has no WRITE_DAC, so SetSecurityInfo would fail with
+    // ERROR_ACCESS_DENIED. The kernel copies the descriptor during the call,
+    // so `security` only needs to live until this function returns.
+    let mut security = peer_auth::PipeSecurity::new()?;
+    // SAFETY: `security` points at a valid SECURITY_ATTRIBUTES for the
+    // duration of the call.
+    unsafe { options.create_with_security_attributes_raw(PIPE_NAME, security.as_mut_ptr()) }
 }
 
 #[cfg(test)]

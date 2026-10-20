@@ -1,6 +1,6 @@
 [package]
 name = "proxybase-gui"
-version = "0.1.88"
+version = "0.1.89"
 description = "ProxyBase desktop GUI built with Tauri"
 authors = ["ProxyBase Team"]
 edition = "2021"
