@@ -352,20 +352,37 @@ async fn serve_windows(service: Arc<Service>) -> anyhow::Result<()> {
     use tokio::net::windows::named_pipe::ServerOptions;
 
     tracing::info!(pipe = %PIPE_NAME, "proxybase-tunneld IPC server listening");
-    let mut first = true;
     loop {
         let mut options = ServerOptions::new();
-        options
-            .first_pipe_instance(first)
-            .reject_remote_clients(true);
-        let server = options.create(PIPE_NAME)?;
-        first = false;
+        // Do not use first_pipe_instance(true): a stale daemon or a previous
+        // service instance can still hold an instance and make creation fail
+        // with ERROR_ACCESS_DENIED. The DACL + peer executable check are the
+        // security boundary, not the instance count.
+        options.reject_remote_clients(true);
+        let server = match options.create(PIPE_NAME) {
+            Ok(server) => server,
+            Err(e) => {
+                // A transient instance conflict must not kill the service:
+                // without a server the GUI could never connect again.
+                tracing::warn!(error = %e, "could not create IPC pipe instance; retrying");
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                continue;
+            }
+        };
         #[cfg(windows)]
         {
             use std::os::windows::io::AsRawHandle;
-            peer_auth::apply_pipe_dacl(server.as_raw_handle() as _)?;
+            if let Err(e) = peer_auth::apply_pipe_dacl(server.as_raw_handle() as _) {
+                tracing::error!(error = %e, "could not restrict IPC pipe DACL; retrying");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                continue;
+            }
         }
-        server.connect().await?;
+        if let Err(e) = server.connect().await {
+            // The client may have closed between open and connect.
+            tracing::debug!(error = %e, "IPC pipe connect failed");
+            continue;
+        }
         let peer = match peer_auth::verify_windows_pipe_client(&server) {
             Ok(peer) => peer,
             Err(e) => {

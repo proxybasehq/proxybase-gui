@@ -101,9 +101,7 @@ fn dev_allow_any() -> bool {
 }
 
 #[cfg(unix)]
-pub fn verify_unix_peer(
-    stream: &tokio::net::UnixStream,
-) -> Result<PeerInfo, AuthError> {
+pub fn verify_unix_peer(stream: &tokio::net::UnixStream) -> Result<PeerInfo, AuthError> {
     use std::os::fd::AsRawFd;
 
     let fd = stream.as_raw_fd();
@@ -169,9 +167,8 @@ pub fn verify_unix_peer(
     let (uid, pid) = (u32::MAX, 0u32);
 
     if !dev_allow_any() {
-        let allowed = allowed_uid().ok_or_else(|| {
-            AuthError::Credentials("allowed uid is not configured".into())
-        })?;
+        let allowed = allowed_uid()
+            .ok_or_else(|| AuthError::Credentials("allowed uid is not configured".into()))?;
         if uid == 0 {
             return Err(AuthError::RootClient);
         }
@@ -180,11 +177,7 @@ pub fn verify_unix_peer(
         }
     }
 
-    let executable = if pid != 0 {
-        process_path(pid)
-    } else {
-        None
-    };
+    let executable = if pid != 0 { process_path(pid) } else { None };
 
     if !dev_allow_any() {
         let exe = executable
@@ -248,7 +241,8 @@ fn process_path(_pid: u32) -> Option<PathBuf> {
 fn same_executable(expected: &std::path::Path, actual: &std::path::Path) -> bool {
     #[cfg(unix)]
     {
-        let canonical = |p: &std::path::Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        let canonical =
+            |p: &std::path::Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
         canonical(expected) == canonical(actual)
     }
     #[cfg(windows)]
@@ -297,14 +291,12 @@ fn is_other_writable(_path: &std::path::Path) -> bool {
 // ---------------------------------------------------------------------------
 
 #[cfg(windows)]
-const PIPE_SDDL: &str = "D:(A;;GRGW;;;SY)(A;;GRGW;;;BA)(A;;GRGW;;;IU)";
+const PIPE_SDDL: &str = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;IU)";
 
 /// Restrict a named-pipe handle to LocalSystem, Administrators and interactive
 /// users. Call before the first client can connect.
 #[cfg(windows)]
-pub fn apply_pipe_dacl(
-    handle: windows_sys::Win32::Foundation::HANDLE,
-) -> std::io::Result<()> {
+pub fn apply_pipe_dacl(handle: windows_sys::Win32::Foundation::HANDLE) -> std::io::Result<()> {
     use std::ptr::null_mut;
     use windows_sys::Win32::Foundation::LocalFree;
     use windows_sys::Win32::Security::Authorization::{

@@ -40,7 +40,9 @@ hostname (which would resolve to a fake IP while the tunnel is active).
   daemon rejects any other binary.
 - The root daemon binary is copied to a root-owned directory
   (`/usr/local/lib/proxybase`, `/Library/Application Support/ProxyBase`,
-  `%ProgramFiles%\ProxyBase`) before service registration.
+  `%ProgramFiles%\ProxyBase\tunneld`) before service registration. The Windows
+  subdirectory matters: installing over the sidecar next to the GUI would
+  replace the executable the elevated installer is currently running from.
 
 ## Install paths triggered on first use
 
@@ -54,10 +56,24 @@ hostname (which would resolve to a fake IP while the tunnel is active).
 
 ## Windows prerequisites
 
-`tun-rs` loads `wintun.dll` from the daemon's executable directory. Vendor the
-Microsoft-signed DLLs into `src-tauri/resources/wintun/{amd64,arm64}/` before
-building; the installer copies the matching one next to the service binary.
-They are intentionally not checked in.
+`tun-rs` loads `wintun.dll` from the daemon's executable directory. The
+Microsoft-signed DLLs are intentionally not checked in: release CI downloads
+the pinned Wintun 0.14.1 archive, verifies its SHA-256 and Authenticode
+signature, and stages it in `src-tauri/resources/wintun/{amd64,arm64}/`. The
+service installer copies the matching DLL next to the installed daemon. For a
+local Windows build, download the same archive from <https://wintun.net/> and
+copy the DLL manually.
+
+## Windows troubleshooting
+
+- `%ProgramData%\ProxyBase\tunneld.log` — service log (stderr is invisible to
+  a LocalSystem service).
+- `%ProgramData%\ProxyBase\last_install_error.txt` — written by the elevated
+  installer when registration/startup fails; the GUI includes it in the
+  elevation error and removes it after a successful install.
+- The GUI waits up to 15 s for the named pipe after elevation. The installer
+  itself stops and deletes any previous `ProxyBaseTunnelService` before
+  replacing the binary, then waits for the SCM to report `Running`.
 
 ## Crash recovery
 

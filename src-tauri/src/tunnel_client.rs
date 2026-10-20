@@ -6,13 +6,13 @@
 
 #![cfg(not(target_os = "android"))]
 
+#[cfg(windows)]
+use libproxybase::tunnel::config::TUNNELD_PIPE_NAME;
+#[cfg(unix)]
+use libproxybase::tunnel::config::TUNNELD_SOCKET_PATH;
 use libproxybase::tunnel::config::{
     encode_ipc_frame, TunnelIpcEnvelope, TunnelIpcRequest, TunnelIpcResponse, MAX_IPC_FRAME,
 };
-#[cfg(unix)]
-use libproxybase::tunnel::config::TUNNELD_SOCKET_PATH;
-#[cfg(windows)]
-use libproxybase::tunnel::config::TUNNELD_PIPE_NAME;
 use libproxybase::tunnel::{TunnelConfig, TunnelErrorCode, TunnelState};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -108,7 +108,10 @@ impl ClientState {
     }
 
     async fn refresh_state(&self) -> Result<(), String> {
-        match self.send_request_with(TunnelIpcRequest::GetState, false).await? {
+        match self
+            .send_request_with(TunnelIpcRequest::GetState, false)
+            .await?
+        {
             TunnelIpcResponse::State { state } => {
                 self.emit_state(state).await;
                 Ok(())
@@ -131,9 +134,7 @@ impl ClientState {
                 self.install(reader, writer).await;
                 Ok(())
             }
-            Err(e) if allow_elevation && daemon_absent(&e) => {
-                self.elevate_and_poll().await
-            }
+            Err(e) if allow_elevation && daemon_absent(&e) => self.elevate_and_poll().await,
             Err(e) => Err(format!("cannot reach proxybase-tunneld: {e}")),
         }
     }
@@ -147,10 +148,7 @@ impl ClientState {
         });
     }
 
-    async fn send_request(
-        &self,
-        request: TunnelIpcRequest,
-    ) -> Result<TunnelIpcResponse, String> {
+    async fn send_request(&self, request: TunnelIpcRequest) -> Result<TunnelIpcResponse, String> {
         self.send_request_with(request, true).await
     }
 
@@ -165,8 +163,11 @@ impl ClientState {
             let (tx, rx) = oneshot::channel();
             self.pending.lock().await.insert(id, tx);
 
-            let frame = encode_ipc_frame(&TunnelIpcEnvelope::Request { id, request: clone_request(&request) })
-                .map_err(|e| e.to_string())?;
+            let frame = encode_ipc_frame(&TunnelIpcEnvelope::Request {
+                id,
+                request: clone_request(&request),
+            })
+            .map_err(|e| e.to_string())?;
             let sent = {
                 let mut guard = self.writer.lock().await;
                 match guard.as_mut() {
@@ -214,15 +215,21 @@ impl ClientState {
             return Err(e);
         }
 
-        // The installer starts the service; wait for the socket.
-        for _ in 0..100 {
+        // The installer starts the service; wait for the socket. Windows
+        // service creation can take a few seconds on first install.
+        for _ in 0..150 {
             tokio::time::sleep(Duration::from_millis(100)).await;
             if let Ok((reader, writer)) = open_stream().await {
                 self.install(reader, writer).await;
                 return Ok(());
             }
         }
-        let message = "proxybase-tunneld did not start after elevation".to_string();
+        let mut message = "proxybase-tunneld did not start after elevation".to_string();
+        #[cfg(target_os = "windows")]
+        if let Some(detail) = read_install_error() {
+            message.push_str(": ");
+            message.push_str(&detail);
+        }
         self.emit_state(TunnelState::Error {
             code: TunnelErrorCode::PrivilegeElevationDenied,
             message: message.clone(),
@@ -279,9 +286,7 @@ async fn read_loop(mut reader: BoxedRead, state: Arc<ClientState>, generation: u
                         .await
                 }
                 TunnelIpcResponse::Error { code, message } => {
-                    state
-                        .emit_state(TunnelState::Error { code, message })
-                        .await
+                    state.emit_state(TunnelState::Error { code, message }).await
                 }
                 TunnelIpcResponse::Pong { .. } => {}
             },
@@ -494,7 +499,8 @@ async fn elevate() -> Result<(), String> {
     let uid = unsafe { libc::getuid() } as u32;
     #[cfg(unix)]
     let uid_arg = uid.to_string();
-    let gui_path = std::env::current_exe().map_err(|e| format!("cannot locate GUI executable: {e}"))?;
+    let gui_path =
+        std::env::current_exe().map_err(|e| format!("cannot locate GUI executable: {e}"))?;
     let gui_path_text = gui_path.display().to_string();
 
     #[cfg(target_os = "macos")]
@@ -544,7 +550,11 @@ async fn elevate() -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        return windows_elevate(&sidecar, &gui_path);
+        // ShellExecuteExW + WaitForSingleObject block; keep them off the async
+        // runtime threads.
+        return tokio::task::spawn_blocking(move || windows_elevate(&sidecar, &gui_path))
+            .await
+            .map_err(|e| format!("elevation task failed: {e}"))?;
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
@@ -565,27 +575,48 @@ fn apple_script_escape(value: &str) -> String {
 }
 
 #[cfg(target_os = "windows")]
+fn install_error_path() -> std::path::PathBuf {
+    std::env::var_os("ProgramData")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from(r"C:\ProgramData"))
+        .join("ProxyBase")
+        .join("last_install_error.txt")
+}
+
+#[cfg(target_os = "windows")]
+fn read_install_error() -> Option<String> {
+    std::fs::read_to_string(install_error_path())
+        .ok()
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+}
+
+#[cfg(target_os = "windows")]
 fn windows_elevate(sidecar: &std::path::Path, gui_path: &std::path::Path) -> Result<(), String> {
     use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
-    use windows_sys::Win32::System::Threading::{
-        GetExitCodeProcess, WaitForSingleObject, INFINITE,
+    use windows_sys::Win32::Foundation::{
+        CloseHandle, GetLastError, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT,
     };
-    use windows_sys::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
+    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject};
+    use windows_sys::Win32::UI::Shell::{
+        ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW,
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE;
 
     fn wide(s: &std::ffi::OsStr) -> Vec<u16> {
         s.encode_wide().chain(std::iter::once(0)).collect()
     }
 
+    // Remove any stale diagnostic from a previous attempt so a failure below
+    // is attributable to this run.
+    let _ = std::fs::remove_file(install_error_path());
+
     let file = wide(sidecar.as_os_str());
     let verb = wide(std::ffi::OsStr::new("runas"));
-    let params = wide(
-        &std::ffi::OsStr::new(&format!(
-            "--install-and-start --gui-path \"{}\"",
-            gui_path.display()
-        )),
-    );
+    let params = wide(&std::ffi::OsStr::new(&format!(
+        "--install-and-start --gui-path \"{}\"",
+        gui_path.display()
+    )));
     let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
     info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
     info.fMask = SEE_MASK_NOCLOSEPROCESS;
@@ -603,13 +634,28 @@ fn windows_elevate(sidecar: &std::path::Path, gui_path: &std::path::Path) -> Res
         return Err(format!("elevation failed with Win32 error {code}"));
     }
     let process: HANDLE = info.hProcess;
-    if !process.is_null() {
-        unsafe {
-            WaitForSingleObject(process, INFINITE);
-            let mut exit_code = 0u32;
-            let _ = GetExitCodeProcess(process, &mut exit_code);
-            CloseHandle(process);
+    if process.is_null() {
+        return Err("elevation started but Windows returned no process handle".into());
+    }
+
+    // Installation is quick (copy + service registration); never hang forever
+    // if UAC is dismissed or the process is stuck.
+    let wait = unsafe { WaitForSingleObject(process, 120_000) };
+    if wait == WAIT_TIMEOUT {
+        unsafe { CloseHandle(process) };
+        return Err("timed out waiting for the privileged installer".into());
+    }
+    let mut exit_code = 1u32;
+    let got_exit = unsafe { GetExitCodeProcess(process, &mut exit_code) };
+    unsafe { CloseHandle(process) };
+    if wait != WAIT_OBJECT_0 || got_exit == 0 {
+        return Err("could not determine the privileged installer result".into());
+    }
+    if exit_code != 0 {
+        if let Some(detail) = read_install_error() {
+            return Err(format!("privileged install failed: {detail}"));
         }
+        return Err(format!("privileged install failed (exit code {exit_code})"));
     }
     Ok(())
 }

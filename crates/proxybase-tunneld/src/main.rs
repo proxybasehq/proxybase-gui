@@ -9,10 +9,10 @@
 
 mod ipc_server;
 mod peer_auth;
-#[cfg(windows)]
-mod service_win;
 #[cfg(unix)]
 mod service_unix;
+#[cfg(windows)]
+mod service_win;
 
 use clap::Parser;
 use std::sync::Arc;
@@ -57,15 +57,63 @@ struct Cli {
     gui_path: Option<std::path::PathBuf>,
 }
 
+#[cfg(windows)]
+fn program_data_dir() -> std::path::PathBuf {
+    std::env::var_os("ProgramData")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from(r"C:\ProgramData"))
+        .join("ProxyBase")
+}
+
+#[cfg(windows)]
+fn install_error_path() -> std::path::PathBuf {
+    program_data_dir().join("last_install_error.txt")
+}
+
+fn env_filter() -> tracing_subscriber::EnvFilter {
+    tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
+}
+
+fn init_tracing() {
+    // A Windows service has no console; stderr disappears. Persist logs next
+    // to the journal so startup failures can be diagnosed.
+    #[cfg(windows)]
+    {
+        let dir = program_data_dir();
+        let appender = std::fs::create_dir_all(&dir)
+            .map_err(|e| e.to_string())
+            .and_then(|()| {
+                tracing_appender::rolling::Builder::new()
+                    .rotation(tracing_appender::rolling::Rotation::NEVER)
+                    .filename_prefix("tunneld.log")
+                    .build(&dir)
+                    .map_err(|e| e.to_string())
+            });
+        if let Ok(appender) = appender {
+            let (writer, guard) = tracing_appender::non_blocking(appender);
+            let initialized = tracing_subscriber::fmt()
+                .with_env_filter(env_filter())
+                .with_writer(writer)
+                .with_ansi(false)
+                .try_init()
+                .is_ok();
+            if initialized {
+                // The worker guard must live for the process lifetime.
+                std::mem::forget(guard);
+                return;
+            }
+        }
+    }
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(env_filter())
+        .with_writer(std::io::stderr)
+        .try_init();
+}
+
 fn main() {
     let cli = Cli::parse();
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .with_writer(std::io::stderr)
-        .init();
+    init_tracing();
 
     if let Some(uid) = cli.allowed_uid {
         std::env::set_var("PROXYBASE_ALLOWED_UID", uid.to_string());
@@ -79,13 +127,27 @@ fn main() {
         return;
     }
 
-    if cli.install_systemd || cli.install_launchd || cli.install_service || cli.install_and_start
-    {
-        if let Err(e) = install(&cli) {
-            eprintln!("proxybase-tunneld: installation failed: {e}");
-            std::process::exit(1);
+    if cli.install_systemd || cli.install_launchd || cli.install_service || cli.install_and_start {
+        match install(&cli) {
+            Ok(()) => {
+                #[cfg(windows)]
+                {
+                    let _ = std::fs::remove_file(install_error_path());
+                }
+                println!("ProxyBase tunnel service installed and started.");
+                return;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "service installation failed");
+                #[cfg(windows)]
+                {
+                    let _ = std::fs::create_dir_all(program_data_dir());
+                    let _ = std::fs::write(install_error_path(), format!("{e}\n"));
+                }
+                eprintln!("proxybase-tunneld: installation failed: {e}");
+                std::process::exit(1);
+            }
         }
-        return;
     }
 
     if !cli.run_daemon {
@@ -96,6 +158,7 @@ fn main() {
     }
 
     if let Err(e) = run_daemon() {
+        tracing::error!(error = %e, "daemon terminated");
         eprintln!("proxybase-tunneld: fatal: {e}");
         std::process::exit(1);
     }
@@ -117,7 +180,6 @@ fn install(cli: &Cli) -> anyhow::Result<()> {
             anyhow::bail!("use --install-systemd on Linux or --install-launchd on macOS");
         }
         service_unix::install(uid, cli.gui_path.as_deref())?;
-        println!("ProxyBase tunnel service installed and started.");
         Ok(())
     }
     #[cfg(windows)]
@@ -127,7 +189,6 @@ fn install(cli: &Cli) -> anyhow::Result<()> {
             anyhow::bail!("use --install-service on Windows");
         }
         service_win::install(cli.allowed_uid, cli.gui_path.as_deref())?;
-        println!("ProxyBase tunnel service installed and started.");
         Ok(())
     }
     #[cfg(not(any(unix, windows)))]
@@ -173,12 +234,10 @@ fn run_daemon() -> anyhow::Result<()> {
             let serve_engine = engine.clone();
             let serve = tokio::spawn(async move { ipc_server::serve(serve_engine).await });
 
-            let mut sigterm = tokio::signal::unix::signal(
-                tokio::signal::unix::SignalKind::terminate(),
-            )?;
-            let mut sigint = tokio::signal::unix::signal(
-                tokio::signal::unix::SignalKind::interrupt(),
-            )?;
+            let mut sigterm =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+            let mut sigint =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
             let outcome = tokio::select! {
                 result = serve => result,
                 _ = sigterm.recv() => {

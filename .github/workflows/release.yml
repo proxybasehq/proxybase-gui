@@ -78,6 +78,34 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Vendor signed Wintun DLLs
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $expected = "07C256185D6EE3652E09FA55C0B673E2624B565E02C4B9091C79CA7D2F24EF51"
+          $zip = Join-Path $env:RUNNER_TEMP "wintun.zip"
+          Invoke-WebRequest "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile $zip
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($actual -ne $expected) {
+            throw "wintun.zip checksum mismatch: $actual"
+          }
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP "wintun") -Force
+          $src = Join-Path $env:RUNNER_TEMP "wintun/wintun/bin"
+          # Empty directories are not tracked by git, so create them first.
+          New-Item -ItemType Directory -Force "src-tauri/resources/wintun/amd64" | Out-Null
+          New-Item -ItemType Directory -Force "src-tauri/resources/wintun/arm64" | Out-Null
+          Copy-Item (Join-Path $src "amd64/wintun.dll") "src-tauri/resources/wintun/amd64/wintun.dll" -Force
+          Copy-Item (Join-Path $src "arm64/wintun.dll") "src-tauri/resources/wintun/arm64/wintun.dll" -Force
+          foreach ($arch in @("amd64", "arm64")) {
+            $dll = "src-tauri/resources/wintun/$arch/wintun.dll"
+            $sig = Get-AuthenticodeSignature $dll
+            if ($sig.Status -ne "Valid") {
+              throw "$dll is not signed by a trusted publisher ($($sig.Status))"
+            }
+            Write-Host "$dll signed by $($sig.SignerCertificate.Subject)"
+          }
+
       - name: Build release bundles
         if: matrix.os != 'macos-14'
         run: pnpm tauri build

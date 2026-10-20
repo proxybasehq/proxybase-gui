@@ -109,7 +109,8 @@ design is documented in `docs/system-tunnel.md`.
 - **Build**: `scripts/prepare-sidecar.mjs` builds and copies
   `proxybase-tunneld` into `src-tauri/binaries/` for Tauri `externalBin`.
   Desktop-only `externalBin`/Wintun resources live in
-  `tauri.{macos,linux,windows}.conf.json`. Vendor signed
-  `resources/wintun/{amd64,arm64}/wintun.dll` before Windows builds.
+  `tauri.{macos,linux,windows}.conf.json`. Release CI downloads and verifies
+  the signed `resources/wintun/{amd64,arm64}/wintun.dll` (Wintun 0.14.1);
+  local Windows builds must vendor it manually.
 - **Commands**: `cargo test -p libproxybase tunnel::`,
   `cargo test -p proxybase-tunneld`, `pnpm tauri dev`.
