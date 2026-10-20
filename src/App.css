@@ -743,10 +743,9 @@ tr:hover td {
 /* ---- System tunnel banner ---- */
 .tunnel-banner {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 12px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 12px;
   background: #171717;
   color: #fafafa;
   font-size: 12px;
@@ -756,29 +755,45 @@ tr:hover td {
   background: #3b1212;
   border-bottom-color: #5b1a1a;
 }
-.tunnel-banner-main {
+.tunnel-banner-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  flex-wrap: wrap;
   min-width: 0;
+}
+.tunnel-banner-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
 }
 .tunnel-banner-title {
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.tunnel-banner-meta {
+.tunnel-banner-meta-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
+  padding-left: 15px;
   color: #a3a3a3;
-  flex-wrap: wrap;
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
 }
 .tunnel-banner-error-text {
   color: #fca5a5;
   font-size: 11px;
+  padding-left: 15px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .tunnel-mono {
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -789,3 +804,4 @@ tr:hover td {
   gap: 6px;
   flex-shrink: 0;
 }
+

@@ -65,6 +65,52 @@ pub fn proxybase_dir() -> PathBuf {
         .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".proxybase"))
 }
 
+/// Draw a green rounded border around the tray icon while the tunnel is
+/// active. The icon is generated at runtime so no extra image assets (and no
+/// platform-specific icon variants) are needed.
+#[cfg(desktop)]
+fn tunnel_bordered_icon(rgba: &[u8], width: u32, height: u32) -> Vec<u8> {
+    let mut out = rgba.to_vec();
+    let w = width as i64;
+    let h = height as i64;
+    if w < 12 || h < 12 || out.len() < (width as usize * height as usize * 4) {
+        return out;
+    }
+
+    let border = (w.min(h) / 10).clamp(2, 12);
+    let radius = (w.min(h) / 5).max(border + 2);
+
+    let inside = |x: i64, y: i64, inset: i64, r: i64| -> bool {
+        let left = inset;
+        let top = inset;
+        let right = w - 1 - inset;
+        let bottom = h - 1 - inset;
+        if x < left || x > right || y < top || y > bottom {
+            return false;
+        }
+        let r = r.max(0);
+        let cx = x.clamp(left + r, right - r);
+        let cy = y.clamp(top + r, bottom - r);
+        let dx = x - cx;
+        let dy = y - cy;
+        dx * dx + dy * dy <= r * r
+    };
+
+    // The same green used by the in-app "tunnel active" accent.
+    let color = [34u8, 197, 94, 255];
+    for y in 0..h {
+        for x in 0..w {
+            if inside(x, y, 0, radius) && !inside(x, y, border, radius - border) {
+                let idx = ((y as u32 * width + x as u32) * 4) as usize;
+                if idx + 3 < out.len() {
+                    out[idx..idx + 4].copy_from_slice(&color);
+                }
+            }
+        }
+    }
+    out
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = rustls::crypto::ring::default_provider().install_default();
@@ -108,6 +154,14 @@ pub fn run() {
                 if let Some(icon) = _app.default_window_icon() {
                     let vis = window_visible.clone();
                     let icon_cloned = icon.clone();
+                    // Generate the tunnel-mode icon once: a green rounded ring
+                    // around the normal tray icon. Switching to it is a cheap
+                    // `set_icon` call, no assets are required.
+                    let base_rgba = icon.rgba().to_vec();
+                    let icon_width = icon.width();
+                    let icon_height = icon.height();
+                    let active_rgba =
+                        tunnel_bordered_icon(&base_rgba, icon_width, icon_height);
 
                     let tunnel_status = MenuItemBuilder::with_id(
                         "tunnel_status",
@@ -129,35 +183,10 @@ pub fn run() {
                         .items(&[&show_item, &quit_item])
                         .build()?;
 
-                    // Keep the tray label in sync without waking the daemon
-                    // more than necessary.
-                    {
-                        let label = tunnel_status.clone();
-                        tauri::async_runtime::spawn(async move {
-                            loop {
-                                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                                let state = tunnel_client::status()
-                                    .await
-                                    .unwrap_or(TunnelState::Disconnected);
-                                let text = match state {
-                                    TunnelState::Disconnected => {
-                                        "System tunnel: disconnected".to_string()
-                                    }
-                                    TunnelState::Connected { exit_ip, .. } => {
-                                        format!("System tunnel: connected ({exit_ip})")
-                                    }
-                                    TunnelState::Error { message, .. } => {
-                                        format!("System tunnel: error — {message}")
-                                    }
-                                    _ => "System tunnel: connecting…".to_string(),
-                                };
-                                let _ = label.set_text(text);
-                            }
-                        });
-                    }
-
-                    let _ = TrayIconBuilder::new()
+                    let tray = TrayIconBuilder::new()
                         .icon(icon_cloned)
+                        .icon_as_template(false)
+                        .tooltip("ProxyBase")
                         .menu(&tray_menu)
                         .show_menu_on_left_click(false)
                         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -197,7 +226,55 @@ pub fn run() {
                                 }
                             }
                         })
-                        .build(_app);
+                        .build(_app)
+                        .ok();
+
+                    // Keep the tray label and the tunnel border in sync without
+                    // waking the daemon more than necessary.
+                    {
+                        let label = tunnel_status.clone();
+                        let tray = tray.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let base_icon = (base_rgba, icon_width, icon_height);
+                            let active_icon = (active_rgba, icon_width, icon_height);
+                            let mut last_active: Option<bool> = None;
+                            loop {
+                                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                                let state = tunnel_client::status()
+                                    .await
+                                    .unwrap_or(TunnelState::Disconnected);
+                                let active = state.is_active();
+                                let text = match state {
+                                    TunnelState::Disconnected => {
+                                        "System tunnel: disconnected".to_string()
+                                    }
+                                    TunnelState::Connected { exit_ip, .. } => {
+                                        format!("System tunnel: connected ({exit_ip})")
+                                    }
+                                    TunnelState::Error { message, .. } => {
+                                        format!("System tunnel: error — {message}")
+                                    }
+                                    _ => "System tunnel: connecting…".to_string(),
+                                };
+                                let _ = label.set_text(text);
+
+                                if last_active != Some(active) {
+                                    if let Some(tray) = &tray {
+                                        let icon = if active { &active_icon } else { &base_icon };
+                                        let _ = tray.set_icon(Some(tauri::image::Image::new(
+                                            &icon.0, icon.1, icon.2,
+                                        )));
+                                        let _ = tray.set_tooltip(Some(if active {
+                                            "ProxyBase — system tunnel active"
+                                        } else {
+                                            "ProxyBase"
+                                        }));
+                                    }
+                                    last_active = Some(active);
+                                }
+                            }
+                        });
+                    }
                 }
 
                 // Hide instead of close — so closing the window sends it to tray
@@ -297,4 +374,26 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(all(test, desktop))]
+mod tray_icon_tests {
+    #[test]
+    fn tunnel_border_draws_a_green_ring_and_leaves_the_center_untouched() {
+        let (w, h) = (32u32, 32u32);
+        let rgba = vec![0u8; (w * h * 4) as usize];
+        let out = super::tunnel_bordered_icon(&rgba, w, h);
+        let green = [34u8, 197, 94, 255];
+
+        // Middle of the left edge is on the ring.
+        let edge = ((16 * w) * 4) as usize;
+        assert_eq!(&out[edge..edge + 4], &green);
+
+        // The center is untouched (still transparent).
+        let center = ((16 * w + 16) * 4) as usize;
+        assert_eq!(&out[center..center + 4], &[0, 0, 0, 0]);
+
+        // The rounded top-left corner is outside the border.
+        assert_eq!(&out[0..4], &[0, 0, 0, 0]);
+    }
 }

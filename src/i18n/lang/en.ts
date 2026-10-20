@@ -341,10 +341,6 @@ const en = {
   "settings.systemLangLabel": "System ({lang})",
   // System tunnel (VPN mode)
   "tunnel.column": "Tunnel",
-  "tunnel.shortTunnel": "Tunnel",
-  "tunnel.shortActive": "Active",
-  "tunnel.shortSwitch": "Switch",
-  "tunnel.shortConnecting": "Connecting",
   "tunnel.enable": "Tunnel System Traffic",
   "tunnel.active": "Tunnel Active",
   "tunnel.switchHere": "Switch Tunnel Here",

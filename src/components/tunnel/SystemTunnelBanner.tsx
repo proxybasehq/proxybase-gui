@@ -68,53 +68,69 @@ export default function SystemTunnelBanner({ onTopUp }: { onTopUp?: () => void }
   return (
     <>
       <div className={`tunnel-banner ${errored ? "tunnel-banner-error" : connected ? "tunnel-banner-active" : ""}`}>
-        <div className="tunnel-banner-main">
-          <span className={`status-dot ${connected ? "status-dot-connected" : "status-dot-disconnected"}`} />
-          <span className="tunnel-banner-title">{statusText}</span>
-          {connected && (
-            <span className="tunnel-banner-meta">
+        <div className="tunnel-banner-row">
+          <div className="tunnel-banner-heading">
+            <span className={`status-dot ${connected ? "status-dot-connected" : "status-dot-disconnected"}`} />
+            <span className="tunnel-banner-title">{statusText}</span>
+          </div>
+          <div className="tunnel-banner-actions">
+            {quotaExhausted && onTopUp && (
+              <button
+                className="btn btn-primary btn-sm"
+                style={{ padding: "0 10px", height: 26, fontSize: 11 }}
+                onClick={onTopUp}
+              >
+                {t("tunnel.topUp")}
+              </button>
+            )}
+            {!errored && (
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ padding: "0 10px", height: 26, fontSize: 11 }}
+                onClick={() => setShowSettings(true)}
+                title={t("tunnel.settings")}
+              >
+                {t("tunnel.settings")}
+              </button>
+            )}
+            <button
+              className="btn btn-danger btn-sm"
+              style={{ padding: "0 10px", height: 26, fontSize: 11 }}
+              disabled={busy}
+              onClick={() => (permissionError ? dismissError() : void disable())}
+            >
+              {permissionError ? t("common.close") : t("tunnel.disconnect")}
+            </button>
+          </div>
+        </div>
+
+        {connected && (
+          <>
+            <div className="tunnel-banner-meta-row">
               {state.country_code ? <CountryFlag code={state.country_code} /> : null}
               <span className="tunnel-mono">{state.exit_ip}</span>
               <span className="tunnel-mono">{state.latency_ms} ms</span>
               <span className="tunnel-mono">{formatDuration(connectedFor)}</span>
-              <span className="tunnel-mono">
-                ↓ {formatBytesPerSecond(telemetry.rx_bps)} ↑ {formatBytesPerSecond(telemetry.tx_bps)}
-              </span>
+            </div>
+            <div className="tunnel-banner-meta-row">
+              <span className="tunnel-mono">↓ {formatBytesPerSecond(telemetry.rx_bps)}</span>
+              <span className="tunnel-mono">↑ {formatBytesPerSecond(telemetry.tx_bps)}</span>
               <span className="tunnel-mono">
                 {t("tunnel.flows", { count: telemetry.active_flows })}
               </span>
-            </span>
-          )}
-          {errored && <span className="tunnel-banner-error-text">{state.message}</span>}
-          {!connected && !errored && <span className="tunnel-banner-meta">{t("tunnel.pleaseWait")}</span>}
-        </div>
-        <div className="tunnel-banner-actions">
-          {quotaExhausted && onTopUp && (
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ padding: "0 10px", height: 26, fontSize: 11 }}
-              onClick={onTopUp}
-            >
-              {t("tunnel.topUp")}
-            </button>
-          )}
-          <button
-            className="btn btn-secondary btn-sm"
-            style={{ padding: "0 10px", height: 26, fontSize: 11 }}
-            onClick={() => setShowSettings(true)}
-            title={t("tunnel.settings")}
-          >
-            {t("tunnel.settings")}
-          </button>
-          <button
-            className="btn btn-danger btn-sm"
-            style={{ padding: "0 10px", height: 26, fontSize: 11 }}
-            disabled={busy}
-            onClick={() => (permissionError ? dismissError() : void disable())}
-          >
-            {permissionError ? t("common.close") : t("tunnel.disconnect")}
-          </button>
-        </div>
+            </div>
+          </>
+        )}
+
+        {errored && (
+          <div className="tunnel-banner-error-text" title={state.message}>
+            {state.message}
+          </div>
+        )}
+
+        {!connected && !errored && (
+          <div className="tunnel-banner-meta-row">{t("tunnel.pleaseWait")}</div>
+        )}
       </div>
       <TunnelSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
     </>

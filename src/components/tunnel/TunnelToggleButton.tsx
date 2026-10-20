@@ -43,21 +43,14 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
     state.status === "reconnecting" ||
     state.status === "disconnecting";
 
-  const label = compact
-    ? sameProxy
-      ? t("tunnel.shortActive")
-      : otherProxy
-        ? t("tunnel.shortSwitch")
-        : inProgress
-          ? t("tunnel.shortConnecting")
-          : t("tunnel.shortTunnel")
-    : sameProxy
-      ? t("tunnel.active")
-      : otherProxy
-        ? t("tunnel.switchHere")
-        : inProgress
-          ? t("tunnel.connecting")
-          : t("tunnel.enable");
+  // Tooltip / accessible name always uses the full, descriptive label.
+  const label = sameProxy
+    ? t("tunnel.active")
+    : otherProxy
+      ? t("tunnel.switchHere")
+      : inProgress
+        ? t("tunnel.connecting")
+        : t("tunnel.enable");
 
   const errorMessage = state.status === "error" ? state.message : undefined;
 
@@ -67,15 +60,14 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
       style={
         compact
           ? {
-              padding: "0 10px",
-              height: 27,
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
+              padding: 0,
+              width: 26,
+              height: 26,
+              minWidth: 26,
+              fontSize: 14,
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 5,
               borderRadius: 999,
             }
           : {
@@ -87,6 +79,7 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
       }
       disabled={busy || inProgress}
       title={errorMessage || label}
+      aria-label={label}
       onClick={(event) => {
         event.stopPropagation();
         if (sameProxy) {
@@ -98,8 +91,8 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
     >
       {inProgress ? (
         <svg
-          width="12"
-          height="12"
+          width={compact ? 14 : 12}
+          height={compact ? 14 : 12}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -114,14 +107,14 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
           aria-hidden="true"
           style={{
             fontFamily: EMOJI_FONT,
-            fontSize: compact ? 13 : 15,
+            fontSize: compact ? 16 : 15,
             lineHeight: 1,
           }}
         >
           {otherProxy ? SWITCH_EMOJI : TUNNEL_EMOJI}
         </span>
       )}
-      <span>{label}</span>
+      {!compact && <span>{label}</span>}
     </button>
   );
 }
