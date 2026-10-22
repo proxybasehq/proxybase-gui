@@ -28,6 +28,12 @@ The relay host is resolved to an IP *before* the tunnel starts and pinned with
 a `/32` route via the physical gateway; the GUI bridge dials that IP, never the
 hostname (which would resolve to a fake IP while the tunnel is active).
 
+The TUN subnet is installed as its canonical network address
+(`10.255.0.0/30`, not the interface address `10.255.0.2/30`). Linux `ip route`
+rejects prefixes with host bits ("Invalid prefix for given prefix length");
+macOS tolerates them but would install a bogus overlapping route. The rollback
+journal stores the canonical CIDR as well, so cleanup works on every platform.
+
 ## Security
 
 - The GUI never runs elevated. Only `proxybase-tunneld` runs as root.
