@@ -141,6 +141,46 @@ impl ClientState {
         }
     }
 
+    async fn send_ping(&self, timeout: Duration) -> Result<String, String> {
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let (tx, rx) = oneshot::channel();
+        self.pending.lock().await.insert(id, tx);
+
+        let frame = encode_ipc_frame(&TunnelIpcEnvelope::Request {
+            id,
+            request: TunnelIpcRequest::Ping,
+        })
+        .map_err(|e| e.to_string())?;
+
+        let sent = {
+            let mut guard = self.writer.lock().await;
+            match guard.as_mut() {
+                Some(writer) => {
+                    writer.write_all(&frame).await.is_ok() && writer.flush().await.is_ok()
+                }
+                None => false,
+            }
+        };
+        if !sent {
+            self.pending.lock().await.remove(&id);
+            return Err("failed to write ping to IPC socket".into());
+        }
+
+        match tokio::time::timeout(timeout, rx).await {
+            Ok(Ok(TunnelIpcResponse::Pong { version })) => Ok(version),
+            Ok(Ok(TunnelIpcResponse::Error { message, .. })) => Err(message),
+            Ok(Ok(other)) => Err(format!("unexpected ping response: {other:?}")),
+            Ok(Err(_)) => {
+                self.pending.lock().await.remove(&id);
+                Err("IPC connection closed while waiting for ping response".into())
+            }
+            Err(_) => {
+                self.pending.lock().await.remove(&id);
+                Err("ping timed out".into())
+            }
+        }
+    }
+
     async fn ensure_connected(&self, allow_elevation: bool) -> Result<(), String> {
         if self.writer.lock().await.is_some() {
             return Ok(());
@@ -152,7 +192,33 @@ impl ClientState {
         match open_stream().await {
             Ok((reader, writer)) => {
                 self.install(reader, writer).await;
-                Ok(())
+                // Verify the connection with a fast ping. If ping fails or version differs,
+                // the daemon is stale, crashed, or unauthorized.
+                let ping_res = self.send_ping(Duration::from_millis(2000)).await;
+                match ping_res {
+                    Ok(version) => {
+                        let app_version = env!("CARGO_PKG_VERSION");
+                        if version != app_version && allow_elevation {
+                            eprintln!(
+                                "[tunnel] upgrading tunneld: running {version}, expected {app_version}"
+                            );
+                            self.reset().await;
+                            return self.elevate_and_poll().await;
+                        }
+                        Ok(())
+                    }
+                    Err(e) if allow_elevation => {
+                        eprintln!(
+                            "[tunnel] daemon ping failed ({e}); reinstalling service via elevation"
+                        );
+                        self.reset().await;
+                        self.elevate_and_poll().await
+                    }
+                    Err(e) => {
+                        self.reset().await;
+                        Err(format!("cannot reach proxybase-tunneld: {e}"))
+                    }
+                }
             }
             Err(e) if allow_elevation && daemon_absent(&e) => self.elevate_and_poll().await,
             Err(e) => Err(format!("cannot reach proxybase-tunneld: {e}")),
@@ -191,7 +257,9 @@ impl ClientState {
             let sent = {
                 let mut guard = self.writer.lock().await;
                 match guard.as_mut() {
-                    Some(writer) => writer.write_all(&frame).await.is_ok(),
+                    Some(writer) => {
+                        writer.write_all(&frame).await.is_ok() && writer.flush().await.is_ok()
+                    }
                     None => false,
                 }
             };
@@ -206,13 +274,21 @@ impl ClientState {
 
             match tokio::time::timeout(Duration::from_secs(90), rx).await {
                 Ok(Ok(response)) => return Ok(response),
-                _ => {
+                Ok(Err(_)) => {
                     self.pending.lock().await.remove(&id);
                     self.reset().await;
                     if attempt == 0 {
                         continue;
                     }
-                    return Err("proxybase-tunneld did not respond".into());
+                    return Err("proxybase-tunneld connection was closed".into());
+                }
+                Err(_) => {
+                    self.pending.lock().await.remove(&id);
+                    self.reset().await;
+                    if attempt == 0 {
+                        continue;
+                    }
+                    return Err("proxybase-tunneld did not respond in 90 seconds".into());
                 }
             }
         }
@@ -241,7 +317,10 @@ impl ClientState {
             tokio::time::sleep(Duration::from_millis(100)).await;
             if let Ok((reader, writer)) = open_stream().await {
                 self.install(reader, writer).await;
-                return Ok(());
+                if self.send_ping(Duration::from_millis(2000)).await.is_ok() {
+                    return Ok(());
+                }
+                self.reset().await;
             }
         }
         #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
@@ -319,6 +398,7 @@ async fn read_loop(mut reader: BoxedRead, state: Arc<ClientState>, generation: u
     // report a disconnect (avoids a stale reader clobbering a new connection).
     if state.generation.load(Ordering::SeqCst) == generation {
         *state.writer.lock().await = None;
+        state.pending.lock().await.clear();
         let current = state.cached_state().await;
         if current.is_active() {
             // An unexpected daemon exit may leave the kill-switch routes in
@@ -337,7 +417,13 @@ async fn read_frame<R: AsyncRead + Unpin>(reader: &mut R) -> std::io::Result<Opt
     let mut len = [0u8; 4];
     match reader.read_exact(&mut len).await {
         Ok(_) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+        Err(e)
+            if e.kind() == std::io::ErrorKind::UnexpectedEof
+                || e.kind() == std::io::ErrorKind::BrokenPipe
+                || e.kind() == std::io::ErrorKind::ConnectionReset =>
+        {
+            return Ok(None);
+        }
         Err(e) => return Err(e),
     }
     let n = u32::from_be_bytes(len) as usize;
@@ -348,7 +434,17 @@ async fn read_frame<R: AsyncRead + Unpin>(reader: &mut R) -> std::io::Result<Opt
         ));
     }
     let mut buf = vec![0u8; n];
-    reader.read_exact(&mut buf).await?;
+    match reader.read_exact(&mut buf).await {
+        Ok(_) => {}
+        Err(e)
+            if e.kind() == std::io::ErrorKind::UnexpectedEof
+                || e.kind() == std::io::ErrorKind::BrokenPipe
+                || e.kind() == std::io::ErrorKind::ConnectionReset =>
+        {
+            return Ok(None);
+        }
+        Err(e) => return Err(e),
+    }
     Ok(Some(buf))
 }
 

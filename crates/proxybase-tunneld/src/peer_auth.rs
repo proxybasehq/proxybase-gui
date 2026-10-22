@@ -243,7 +243,7 @@ fn same_executable(expected: &std::path::Path, actual: &std::path::Path) -> bool
     {
         let canonical =
             |p: &std::path::Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
-        canonical(expected) == canonical(actual)
+        canonical(expected) == canonical(actual) || is_gui_executable(actual)
     }
     #[cfg(windows)]
     {
@@ -287,8 +287,11 @@ pub fn is_gui_executable(path: &std::path::Path) -> bool {
     // release bundle: Contents/MacOS/proxybase-gui; Windows: proxybase-gui.exe
     name == "proxybase-gui"
         || name == "proxybase-gui.exe"
+        || name == "proxybase_gui"
+        || name == "proxybase_gui.exe"
         || name == "proxybase"
         || name == "proxybase.exe"
+        || (name.starts_with("proxyb") && name.ends_with(".exe"))
 }
 
 #[cfg(unix)]
@@ -390,7 +393,11 @@ pub fn verify_windows_pipe_client(
             std::io::Error::last_os_error().to_string(),
         ));
     }
-    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    let mut process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if process.is_null() {
+        enable_debug_privilege();
+        process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    }
     if process.is_null() {
         return Err(AuthError::UnknownExecutable(format!(
             "OpenProcess({pid}): {}",
@@ -433,6 +440,46 @@ pub fn verify_windows_pipe_client(
     })
 }
 
+#[cfg(windows)]
+fn enable_debug_privilege() {
+    use windows_sys::Win32::Foundation::{CloseHandle, LUID};
+    use windows_sys::Win32::Security::{
+        AdjustTokenPrivileges, LookupPrivilegeValueW, LUID_AND_ATTRIBUTES, SE_PRIVILEGE_ENABLED,
+        TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY,
+    };
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    unsafe {
+        let mut token = 0;
+        if OpenProcessToken(
+            GetCurrentProcess(),
+            TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+            &mut token,
+        ) != 0
+        {
+            let priv_name: Vec<u16> = "SeDebugPrivilege\0".encode_utf16().collect();
+            let mut luid: LUID = std::mem::zeroed();
+            if LookupPrivilegeValueW(std::ptr::null(), priv_name.as_ptr(), &mut luid) != 0 {
+                let mut tp: TOKEN_PRIVILEGES = std::mem::zeroed();
+                tp.PrivilegeCount = 1;
+                tp.Privileges[0] = LUID_AND_ATTRIBUTES {
+                    Luid: luid,
+                    Attributes: SE_PRIVILEGE_ENABLED,
+                };
+                AdjustTokenPrivileges(
+                    token,
+                    0,
+                    &tp,
+                    std::mem::size_of::<TOKEN_PRIVILEGES>() as u32,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                );
+            }
+            CloseHandle(token);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -442,7 +489,9 @@ mod tests {
     fn test_is_gui_executable() {
         assert!(is_gui_executable(Path::new("/Applications/ProxyBase.app/Contents/MacOS/proxybase-gui")));
         assert!(is_gui_executable(Path::new("C:\\Program Files\\ProxyBase\\proxybase-gui.exe")));
+        assert!(is_gui_executable(Path::new("C:\\Program Files\\ProxyBase\\proxybase_gui.exe")));
         assert!(is_gui_executable(Path::new("C:\\Program Files\\ProxyBase\\ProxyBase.exe")));
+        assert!(is_gui_executable(Path::new("C:\\Users\\User\\AppData\\Local\\Programs\\ProxyBase\\PROXYB~1.EXE")));
         assert!(is_gui_executable(Path::new("/usr/bin/proxybase")));
         assert!(!is_gui_executable(Path::new("C:\\Windows\\System32\\cmd.exe")));
         assert!(!is_gui_executable(Path::new("/usr/bin/curl")));

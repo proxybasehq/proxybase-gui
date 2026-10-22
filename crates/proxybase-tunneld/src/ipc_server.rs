@@ -220,6 +220,7 @@ where
                     if writer.write_all(&frame).await.is_err() {
                         break;
                     }
+                    let _ = writer.flush().await;
                 }
                 Err(_) => break,
             }
@@ -261,7 +262,13 @@ async fn read_frame<R: AsyncRead + Unpin>(reader: &mut R) -> std::io::Result<Opt
     let mut len = [0u8; 4];
     match reader.read_exact(&mut len).await {
         Ok(_) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+        Err(e)
+            if e.kind() == std::io::ErrorKind::UnexpectedEof
+                || e.kind() == std::io::ErrorKind::BrokenPipe
+                || e.kind() == std::io::ErrorKind::ConnectionReset =>
+        {
+            return Ok(None);
+        }
         Err(e) => return Err(e),
     }
     let n = u32::from_be_bytes(len) as usize;
@@ -272,7 +279,17 @@ async fn read_frame<R: AsyncRead + Unpin>(reader: &mut R) -> std::io::Result<Opt
         ));
     }
     let mut buf = vec![0u8; n];
-    reader.read_exact(&mut buf).await?;
+    match reader.read_exact(&mut buf).await {
+        Ok(_) => {}
+        Err(e)
+            if e.kind() == std::io::ErrorKind::UnexpectedEof
+                || e.kind() == std::io::ErrorKind::BrokenPipe
+                || e.kind() == std::io::ErrorKind::ConnectionReset =>
+        {
+            return Ok(None);
+        }
+        Err(e) => return Err(e),
+    }
     Ok(Some(buf))
 }
 
@@ -378,6 +395,18 @@ async fn serve_windows(service: Arc<Service>) -> anyhow::Result<()> {
             Ok(peer) => peer,
             Err(e) => {
                 tracing::warn!(error = %e, "rejected IPC peer");
+                let reply = TunnelIpcEnvelope::Response {
+                    id: 0,
+                    response: TunnelIpcResponse::Error {
+                        code: TunnelErrorCode::InternalError,
+                        message: format!("peer authentication failed: {e}"),
+                    },
+                };
+                if let Ok(frame) = encode_ipc_frame(&reply) {
+                    let mut server = server;
+                    let _ = server.write_all(&frame).await;
+                    let _ = server.flush().await;
+                }
                 continue;
             }
         };
