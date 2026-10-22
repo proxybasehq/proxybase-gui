@@ -180,18 +180,50 @@ fn copy_binary() -> anyhow::Result<PathBuf> {
             .join(arch)
             .join("wintun.dll"),
         exe_dir
+            .join("resources")
+            .join("resources")
+            .join("wintun")
+            .join(arch)
+            .join("wintun.dll"),
+        exe_dir
             .join("..")
             .join("resources")
             .join("wintun")
             .join(arch)
             .join("wintun.dll"),
+        exe_dir
+            .join("..")
+            .join("resources")
+            .join("resources")
+            .join("wintun")
+            .join(arch)
+            .join("wintun.dll"),
+        exe_dir
+            .join("wintun")
+            .join(arch)
+            .join("wintun.dll"),
     ];
-    for candidate in candidates {
+    let mut staged_wintun = false;
+    for candidate in &candidates {
         if candidate.exists() {
             let target = install_dir().join("wintun.dll");
-            std::fs::copy(&candidate, &target)?;
-            break;
+            match std::fs::copy(candidate, &target) {
+                Ok(_) => {
+                    tracing::info!(from = %candidate.display(), to = %target.display(), "staged wintun.dll");
+                    staged_wintun = true;
+                    break;
+                }
+                Err(e) => {
+                    tracing::warn!(from = %candidate.display(), error = %e, "could not copy candidate wintun.dll");
+                }
+            }
         }
+    }
+    if !staged_wintun && !install_dir().join("wintun.dll").exists() {
+        tracing::warn!(
+            target_dir = %install_dir().display(),
+            "wintun.dll was not found in any staging candidate path; TUN adapter creation may fail on Windows"
+        );
     }
     Ok(dest)
 }

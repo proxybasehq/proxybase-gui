@@ -248,12 +248,15 @@ fn same_executable(expected: &std::path::Path, actual: &std::path::Path) -> bool
     #[cfg(windows)]
     {
         let normalize = |p: &std::path::Path| {
-            std::fs::canonicalize(p)
-                .unwrap_or_else(|_| p.to_path_buf())
-                .to_string_lossy()
-                .to_ascii_lowercase()
+            let path = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+            normalize_windows_path_str(&path.to_string_lossy())
         };
-        normalize(expected) == normalize(actual)
+        if normalize(expected) == normalize(actual) {
+            return true;
+        }
+        // Fallback: if full paths differ due to short 8.3 names or user-session isolation,
+        // verify that the actual running process has a recognized ProxyBase GUI file name.
+        is_gui_executable(actual)
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -261,11 +264,25 @@ fn same_executable(expected: &std::path::Path, actual: &std::path::Path) -> bool
     }
 }
 
+fn normalize_windows_path_str(s: &str) -> String {
+    let lower = s.to_ascii_lowercase();
+    // std::fs::canonicalize on Windows prepends the verbatim prefix `\\?\`
+    // (or `\\?\unc\`). Strip it so canonicalized and non-canonicalized paths match.
+    let trimmed = lower
+        .strip_prefix(r"\\?\unc\")
+        .map(|rest| format!(r"\\{}", rest))
+        .or_else(|| lower.strip_prefix(r"\\?\").map(|rest| rest.to_string()))
+        .unwrap_or(lower);
+    trimmed
+}
+
 pub fn is_gui_executable(path: &std::path::Path) -> bool {
-    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-        return false;
-    };
-    let name = name.to_ascii_lowercase();
+    let raw = path.to_string_lossy();
+    let name = raw
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(&raw)
+        .to_ascii_lowercase();
     // release bundle: Contents/MacOS/proxybase-gui; Windows: proxybase-gui.exe
     name == "proxybase-gui"
         || name == "proxybase-gui.exe"
@@ -413,4 +430,37 @@ pub fn verify_windows_pipe_client(
         pid,
         executable: Some(path),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_is_gui_executable() {
+        assert!(is_gui_executable(Path::new("/Applications/ProxyBase.app/Contents/MacOS/proxybase-gui")));
+        assert!(is_gui_executable(Path::new("C:\\Program Files\\ProxyBase\\proxybase-gui.exe")));
+        assert!(is_gui_executable(Path::new("C:\\Program Files\\ProxyBase\\ProxyBase.exe")));
+        assert!(is_gui_executable(Path::new("/usr/bin/proxybase")));
+        assert!(!is_gui_executable(Path::new("C:\\Windows\\System32\\cmd.exe")));
+        assert!(!is_gui_executable(Path::new("/usr/bin/curl")));
+    }
+
+    #[test]
+    fn test_normalize_windows_path_str() {
+        let raw = r"C:\Program Files\ProxyBase\proxybase-gui.exe";
+        let verbatim = r"\\?\C:\Program Files\ProxyBase\proxybase-gui.exe";
+        assert_eq!(
+            normalize_windows_path_str(raw),
+            normalize_windows_path_str(verbatim)
+        );
+
+        let unc_raw = r"\\server\share\proxybase.exe";
+        let unc_verbatim = r"\\?\unc\server\share\proxybase.exe";
+        assert_eq!(
+            normalize_windows_path_str(unc_raw),
+            normalize_windows_path_str(unc_verbatim)
+        );
+    }
 }
