@@ -442,7 +442,7 @@ pub fn verify_windows_pipe_client(
 
 #[cfg(windows)]
 fn enable_debug_privilege() {
-    use windows_sys::Win32::Foundation::{CloseHandle, LUID};
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, LUID};
     use windows_sys::Win32::Security::{
         AdjustTokenPrivileges, LookupPrivilegeValueW, LUID_AND_ATTRIBUTES, SE_PRIVILEGE_ENABLED,
         TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY,
@@ -450,7 +450,7 @@ fn enable_debug_privilege() {
     use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
     unsafe {
-        let mut token = 0;
+        let mut token: HANDLE = std::ptr::null_mut();
         if OpenProcessToken(
             GetCurrentProcess(),
             TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
