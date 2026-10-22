@@ -297,9 +297,18 @@ pub fn is_gui_executable(path: &std::path::Path) -> bool {
 #[cfg(unix)]
 fn is_other_writable(path: &std::path::Path) -> bool {
     use std::os::unix::fs::MetadataExt;
-    std::fs::metadata(path)
-        .map(|m| m.mode() & 0o022 != 0)
-        .unwrap_or(true)
+    match std::fs::metadata(path) {
+        Ok(meta) => meta.mode() & 0o022 != 0,
+        // The daemon runs as root. An AppImage's FUSE mount is only
+        // accessible to the user who mounted it (allow_other is off), so root
+        // cannot even stat the GUI binary there (EACCES). The peer's uid was
+        // already verified via SO_PEERCRED, a different local user still
+        // cannot connect, and same-uid processes could already impersonate
+        // the GUI. Treat an unreadable path as not writable instead of
+        // rejecting every AppImage launch.
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => false,
+        Err(_) => true,
+    }
 }
 
 #[cfg(not(unix))]

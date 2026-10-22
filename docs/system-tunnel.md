@@ -55,6 +55,12 @@ hostname (which would resolve to a fake IP while the tunnel is active).
   FUSE mount is only accessible to the mounting user, so root cannot exec the
   sidecar from `/tmp/.mount_*`. The installer enables and **restarts** the
   unit, so upgrades never leave the previous daemon running.
+- AppImage peer authentication: the root daemon also cannot `stat()` the GUI
+  binary inside `/tmp/.mount_*` (FUSE `allow_other` is off). An unreadable
+  executable is treated as not writable by the peer check; the `SO_PEERCRED`
+  uid and the `proxybase-gui` name checks still apply. Without this, every
+  AppImage launch is rejected with "peer executable ... is writable by other
+  users".
 - Windows: `ShellExecuteExW` with `runas` installs `ProxyBaseTunnelService`
   (LocalSystem, auto-start).
 - Android: `VpnService.prepare()` then a foreground `ProxyBaseVpnService`.
