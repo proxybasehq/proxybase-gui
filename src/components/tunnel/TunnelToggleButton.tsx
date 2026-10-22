@@ -14,6 +14,8 @@ interface Props {
   /** Compact variant for table rows. */
   compact?: boolean;
   className?: string;
+  /** Optional async setup before enabling (e.g. ensuring local SOCKS5 bridge is running). */
+  onBeforeEnable?: () => Promise<void>;
 }
 
 /**
@@ -23,7 +25,12 @@ interface Props {
  * - connected to this proxy → disconnect
  * - connected to another proxy → hot-swap without recreating the TUN adapter
  */
-export default function TunnelToggleButton({ proxyId, compact = false, className = "" }: Props) {
+export default function TunnelToggleButton({
+  proxyId,
+  compact = false,
+  className = "",
+  onBeforeEnable,
+}: Props) {
   const { t } = useI18n();
   const { state, enable, disable, busy } = useSystemTunnel();
 
@@ -37,6 +44,7 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
     "proxy_id" in state &&
     state.proxy_id !== proxyId;
   const inProgress =
+    busy ||
     state.status === "requesting_privileges" ||
     state.status === "configuring_routes" ||
     state.status === "verifying_exit_node" ||
@@ -52,11 +60,12 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
         ? t("tunnel.connecting")
         : t("tunnel.enable");
 
-  const errorMessage = state.status === "error" ? state.message : undefined;
+  const isError = state.status === "error";
+  const errorMessage = isError ? state.message : undefined;
 
   return (
     <button
-      className={`btn ${sameProxy ? "btn-success" : "btn-secondary"} ${compact ? "btn-sm" : ""} ${className}`}
+      className={`btn ${sameProxy ? "btn-success" : isError ? "btn-danger" : "btn-secondary"} ${compact ? "btn-sm" : ""} ${className}`}
       style={
         compact
           ? {
@@ -77,15 +86,22 @@ export default function TunnelToggleButton({ proxyId, compact = false, className
               gap: 7,
             }
       }
-      disabled={busy || inProgress}
+      disabled={inProgress}
       title={errorMessage || label}
       aria-label={label}
-      onClick={(event) => {
+      onClick={async (event) => {
         event.stopPropagation();
         if (sameProxy) {
           void disable();
         } else {
-          void enable(proxyId);
+          try {
+            if (onBeforeEnable) {
+              await onBeforeEnable();
+            }
+            void enable(proxyId);
+          } catch (err) {
+            console.error("[tunnel] onBeforeEnable failed:", err);
+          }
         }
       }}
     >

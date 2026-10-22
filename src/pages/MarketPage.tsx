@@ -158,6 +158,26 @@ export default function MarketPage() {
     }
   }
 
+  const ensureBridgeForSession = async (sid: string) => {
+    try {
+      const t = token || (await getToken());
+      if (!t) throw new Error("Please log in to use the system tunnel");
+      const savedPorts = await loadBridgePorts();
+      const preferred = savedPorts[sid] || bridgePortsRef.current[sid] || nextPortRef.current;
+      const port = await ensureBridge(sid, t, preferred);
+      if (port) {
+        const next = { ...bridgePortsRef.current, [sid]: port };
+        setPorts(next);
+        await saveBridgePorts(next);
+      } else {
+        throw new Error("Could not start local SOCKS5 bridge for session");
+      }
+    } catch (err) {
+      console.error("[market] ensureBridgeForSession failed:", err);
+      throw err;
+    }
+  };
+
   // ── Auto-refresh pricing + sessions every minute ──
   // Skips a tick while the previous fetch is still in flight and fails
   // silently.
@@ -635,7 +655,11 @@ export default function MarketPage() {
             )}
 
             <div style={{ marginTop: (connectModal as any).session_type === "sticky" ? "var(--space-xs)" : "var(--space-md)" }}>
-              <TunnelToggleButton proxyId={(connectModal as any).session_id} className="btn-block" />
+              <TunnelToggleButton
+                proxyId={(connectModal as any).session_id}
+                className="btn-block"
+                onBeforeEnable={() => ensureBridgeForSession((connectModal as any).session_id)}
+              />
             </div>
 
             <button className="btn btn-secondary btn-sm" style={{ marginTop: "var(--space-xs)", width: "100%" }} onClick={() => { setConnectModal(null); setRotateSuccess(null); }}>{t("common.close")}</button>
@@ -820,7 +844,11 @@ export default function MarketPage() {
                       <td>{emojiBadge(MODE_EMOJI, (s as any).session_type)}</td>
                       <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
                         {["active", "alive", "open"].includes(String((s as any).status)) ? (
-                          <TunnelToggleButton proxyId={(s as any).session_id} compact />
+                          <TunnelToggleButton
+                            proxyId={(s as any).session_id}
+                            compact
+                            onBeforeEnable={() => ensureBridgeForSession((s as any).session_id)}
+                          />
                         ) : (
                           <span className="text-muted" style={{ fontSize: 11 }}>—</span>
                         )}

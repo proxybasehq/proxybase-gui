@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import {
   disableSystemTunnel,
   enableSystemTunnel,
@@ -66,73 +66,118 @@ export function isTunnelActive(state: TunnelState): boolean {
   return ACTIVE_STATUSES.has(state.status);
 }
 
-export function useSystemTunnel() {
-  const [state, setState] = useState<TunnelState>({ status: "disconnected" });
-  const [telemetry, setTelemetry] = useState<TunnelTelemetry>({
-    rx_bytes_total: 0,
-    tx_bytes_total: 0,
-    rx_bps: 0,
-    tx_bps: 0,
-    active_flows: 0,
-  });
-  const [settings, setSettingsState] = useState<TunnelSettings>(loadTunnelSettings);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const mounted = useRef(true);
+// ---------------------------------------------------------------------------
+// Shared Module Store (Synchronizes Banner, Buttons, and Settings Modal)
+// ---------------------------------------------------------------------------
 
-  const refresh = useCallback(async () => {
-    try {
-      const next = await getSystemTunnelStatus();
-      if (mounted.current) setState(next);
-    } catch {
-      // Daemon not installed yet or app shutting down; keep the last state.
+let globalState: TunnelState = { status: "disconnected" };
+let globalTelemetry: TunnelTelemetry = {
+  rx_bytes_total: 0,
+  tx_bytes_total: 0,
+  rx_bps: 0,
+  tx_bps: 0,
+  active_flows: 0,
+};
+let globalSettings: TunnelSettings = loadTunnelSettings();
+let globalBusy = false;
+let globalError: string | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+function setGlobalState(next: TunnelState) {
+  globalState = next;
+  notify();
+}
+
+function setGlobalTelemetry(next: TunnelTelemetry) {
+  globalTelemetry = next;
+  notify();
+}
+
+function setGlobalBusy(next: boolean) {
+  globalBusy = next;
+  notify();
+}
+
+function setGlobalError(next: string | null) {
+  globalError = next;
+  notify();
+}
+
+let eventsInitialized = false;
+
+async function refreshTunnelState() {
+  try {
+    const next = await getSystemTunnelStatus();
+    // If we are currently showing a user-visible error and the daemon says disconnected,
+    // do not wipe the error banner until the user dismisses or retries.
+    if (globalState.status === "error" && next.status === "disconnected") {
+      return;
     }
-  }, []);
+    setGlobalState(next);
+  } catch {
+    // Daemon not installed yet or app shutting down; keep the last state.
+  }
+}
+
+function initGlobalTunnelEvents() {
+  if (eventsInitialized) return;
+  eventsInitialized = true;
+
+  (async () => {
+    try {
+      await Promise.all([
+        listen<TunnelState>("tunnel://state-changed", (event) => {
+          setGlobalState(event.payload);
+        }),
+        listen<TunnelTelemetry>("tunnel://telemetry", (event) => {
+          setGlobalTelemetry(event.payload);
+        }),
+      ]);
+    } catch {
+      // Events are unavailable outside Tauri; polling still works.
+    }
+    await refreshTunnelState();
+  })();
+
+  // Poll as fallback for platforms where events fire before the webview subscribes
+  setInterval(() => {
+    void refreshTunnelState();
+    void getTunnelTelemetry()
+      .then((t) => {
+        setGlobalTelemetry(t);
+      })
+      .catch(() => {});
+  }, 4000);
+}
+
+export function useSystemTunnel() {
+  const [, setTick] = useState(0);
 
   useEffect(() => {
-    mounted.current = true;
-    let unlisteners: UnlistenFn[] = [];
-    (async () => {
-      try {
-        unlisteners = await Promise.all([
-          listen<TunnelState>("tunnel://state-changed", (event) => {
-            if (mounted.current) setState(event.payload);
-          }),
-          listen<TunnelTelemetry>("tunnel://telemetry", (event) => {
-            if (mounted.current) setTelemetry(event.payload);
-          }),
-        ]);
-      } catch {
-        // Events are unavailable outside Tauri; polling still works.
-      }
-      await refresh();
-    })();
-
-    // Poll as a fallback for platforms where events fire before the webview
-    // subscribes (and for Android service transitions).
-    const interval = setInterval(() => {
-      void refresh();
-      void getTunnelTelemetry()
-        .then((t) => {
-          if (mounted.current) setTelemetry(t);
-        })
-        .catch(() => {});
-    }, 4000);
-
+    initGlobalTunnelEvents();
+    const listener = () => setTick((t) => t + 1);
+    listeners.add(listener);
     return () => {
-      mounted.current = false;
-      clearInterval(interval);
-      for (const unlisten of unlisteners) unlisten();
+      listeners.delete(listener);
     };
-  }, [refresh]);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await refreshTunnelState();
+  }, []);
 
   const enable = useCallback(async (proxyId: string) => {
-    setBusy(true);
-    setError(null);
-    // Read from storage so a settings change made in another hook instance
-    // (e.g. the settings modal) is honoured immediately.
+    setGlobalBusy(true);
+    setGlobalError(null);
     const s = loadTunnelSettings();
     try {
+      console.log(`[tunnel] enabling system tunnel for proxy: ${proxyId}`);
       const next = await enableSystemTunnel(proxyId, {
         killSwitch: s.killSwitch,
         bypassCidrs: s.bypassCidrs,
@@ -140,58 +185,59 @@ export function useSystemTunnel() {
         blockWebrtcStun: s.blockWebrtcStun,
         stopOnGuiExit: s.stopOnGuiExit,
       });
-      if (mounted.current) setState(next);
+      setGlobalState(next);
       return next;
     } catch (e) {
       const message = String(e);
-      setError(message);
-      // A daemon-side failure has already emitted a specific error state;
-      // only synthesise one for transport/elevation failures.
-      setState((prev) =>
-        prev.status === "error"
-          ? prev
-          : { status: "error", code: "internal_error", message }
-      );
+      console.error("[tunnel] enableSystemTunnel failed:", message);
+      setGlobalError(message);
+      // If the backend did not already emit a structured error, synthesize one
+      // so the user sees the error banner.
+      setGlobalState({
+        status: "error",
+        code: "internal_error",
+        message,
+      });
       return null;
     } finally {
-      if (mounted.current) setBusy(false);
+      setGlobalBusy(false);
     }
   }, []);
 
   const disable = useCallback(async () => {
-    setBusy(true);
-    setError(null);
+    setGlobalBusy(true);
+    setGlobalError(null);
     try {
+      console.log("[tunnel] disabling system tunnel");
       const next = await disableSystemTunnel();
-      if (mounted.current) {
-        setState(next);
-        setTelemetry({
-          rx_bytes_total: 0,
-          tx_bytes_total: 0,
-          rx_bps: 0,
-          tx_bps: 0,
-          active_flows: 0,
-        });
-      }
+      setGlobalState(next);
+      setGlobalTelemetry({
+        rx_bytes_total: 0,
+        tx_bytes_total: 0,
+        rx_bps: 0,
+        tx_bps: 0,
+        active_flows: 0,
+      });
       return next;
     } catch (e) {
       const message = String(e);
-      setError(message);
-      setState((prev) =>
-        prev.status === "error"
-          ? prev
-          : { status: "error", code: "internal_error", message }
-      );
+      console.error("[tunnel] disableSystemTunnel failed:", message);
+      setGlobalError(message);
+      setGlobalState({
+        status: "error",
+        code: "internal_error",
+        message,
+      });
       return null;
     } finally {
-      if (mounted.current) setBusy(false);
+      setGlobalBusy(false);
     }
   }, []);
 
   const dismissError = useCallback(() => {
-    setError(null);
-    setState({ status: "disconnected" });
-    setTelemetry({
+    setGlobalError(null);
+    setGlobalState({ status: "disconnected" });
+    setGlobalTelemetry({
       rx_bytes_total: 0,
       tx_bytes_total: 0,
       rx_bps: 0,
@@ -201,20 +247,21 @@ export function useSystemTunnel() {
   }, []);
 
   const setSettings = useCallback((next: TunnelSettings) => {
-    setSettingsState(next);
+    globalSettings = next;
     persistTunnelSettings(next);
+    notify();
   }, []);
 
   return {
-    state,
-    telemetry,
-    settings,
+    state: globalState,
+    telemetry: globalTelemetry,
+    settings: globalSettings,
     setSettings,
     enable,
     disable,
     dismissError,
     refresh,
-    busy,
-    error,
+    busy: globalBusy,
+    error: globalError,
   };
 }

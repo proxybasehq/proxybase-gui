@@ -88,6 +88,12 @@ fn client() -> Result<Arc<ClientState>, String> {
         .ok_or_else(|| "tunnel client is not initialized".to_string())
 }
 
+pub async fn emit_error(code: &str, message: &str) {
+    if let Ok(c) = client() {
+        c.emit_error(code, message).await;
+    }
+}
+
 impl ClientState {
     async fn cached_state(&self) -> TunnelState {
         self.state.read().await.clone()
@@ -96,6 +102,20 @@ impl ClientState {
     async fn emit_state(&self, state: TunnelState) {
         *self.state.write().await = state.clone();
         let _ = self.app.emit("tunnel://state-changed", &state);
+    }
+
+    async fn emit_error(&self, code: &str, message: &str) {
+        let err_code = match code {
+            "privilege_elevation_denied" => TunnelErrorCode::PrivilegeElevationDenied,
+            "quota_exhausted" => TunnelErrorCode::QuotaExhausted,
+            "lease_expired" => TunnelErrorCode::LeaseExpired,
+            _ => TunnelErrorCode::InternalError,
+        };
+        self.emit_state(TunnelState::Error {
+            code: err_code,
+            message: message.to_string(),
+        })
+        .await;
     }
 
     async fn emit_telemetry(&self, value: TelemetryView) {
@@ -224,6 +244,7 @@ impl ClientState {
                 return Ok(());
             }
         }
+        #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
         let mut message = "proxybase-tunneld did not start after elevation".to_string();
         #[cfg(target_os = "windows")]
         if let Some(detail) = read_install_error() {
@@ -342,9 +363,22 @@ async fn open_stream() -> std::io::Result<(BoxedRead, BoxedWrite)> {
 #[cfg(windows)]
 async fn open_stream() -> std::io::Result<(BoxedRead, BoxedWrite)> {
     use tokio::net::windows::named_pipe::ClientOptions;
-    let client = ClientOptions::new().open(TUNNELD_PIPE_NAME)?;
-    let (reader, writer) = tokio::io::split(client);
-    Ok((Box::new(reader), Box::new(writer)))
+    const ERROR_PIPE_BUSY: i32 = 231;
+    let mut last_err = None;
+    for _ in 0..20 {
+        match ClientOptions::new().open(TUNNELD_PIPE_NAME) {
+            Ok(client) => {
+                let (reader, writer) = tokio::io::split(client);
+                return Ok((Box::new(reader), Box::new(writer)));
+            }
+            Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY) => {
+                last_err = Some(e);
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| std::io::Error::from_raw_os_error(ERROR_PIPE_BUSY)))
 }
 
 fn daemon_absent(error: &std::io::Error) -> bool {
@@ -427,7 +461,10 @@ pub async fn cached_telemetry() -> TelemetryView {
 
 fn sidecar_path() -> Option<std::path::PathBuf> {
     if let Some(path) = std::env::var_os("PROXYBASE_TUNNELD_PATH") {
-        return Some(std::path::PathBuf::from(path));
+        let p = std::path::PathBuf::from(path);
+        if p.exists() {
+            return Some(p);
+        }
     }
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
@@ -436,16 +473,62 @@ fn sidecar_path() -> Option<std::path::PathBuf> {
     } else {
         "proxybase-tunneld"
     };
-    let direct = dir.join(name);
-    if direct.exists() {
-        return Some(direct);
+
+    let direct_candidates = [
+        dir.join(name),
+        dir.join("binaries").join(name),
+        dir.join("resources").join(name),
+        dir.join("resources").join("binaries").join(name),
+        dir.join("..").join("resources").join(name),
+    ];
+    for candidate in &direct_candidates {
+        if candidate.exists() {
+            return Some(candidate.clone());
+        }
     }
-    // Dev builds: `scripts/prepare-sidecar.mjs` places the target-suffixed
-    // binary in src-tauri/binaries, which is not next to the dev executable.
-    #[cfg(debug_assertions)]
+
+    #[cfg(windows)]
     {
-        let dev_binaries = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries");
-        if let Ok(entries) = std::fs::read_dir(&dev_binaries) {
+        let program_files = std::env::var_os("ProgramFiles")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from(r"C:\Program Files"));
+        let installed = program_files.join("ProxyBase").join("tunneld").join(name);
+        if installed.exists() {
+            return Some(installed);
+        }
+        if let Some(pf86) = std::env::var_os("ProgramFiles(x86)").map(std::path::PathBuf::from) {
+            let installed86 = pf86.join("ProxyBase").join("tunneld").join(name);
+            if installed86.exists() {
+                return Some(installed86);
+            }
+        }
+    }
+
+    // Check dev/build binaries directory if present (e.g. debug or release cargo builds)
+    let dev_binaries = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries");
+    if let Ok(entries) = std::fs::read_dir(&dev_binaries) {
+        for entry in entries.flatten() {
+            let candidate = entry.path();
+            if candidate
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.starts_with("proxybase-tunneld-"))
+                .unwrap_or(false)
+            {
+                return Some(candidate);
+            }
+        }
+    }
+
+    // Tauri externalBin layout (target-triple suffixed) in runtime folders
+    let search_dirs = [
+        dir.to_path_buf(),
+        dir.join("binaries"),
+        dir.join("resources"),
+        dir.join("..").join("resources"),
+    ];
+    for d in &search_dirs {
+        if let Ok(entries) = std::fs::read_dir(d) {
             for entry in entries.flatten() {
                 let candidate = entry.path();
                 if candidate
@@ -456,20 +539,6 @@ fn sidecar_path() -> Option<std::path::PathBuf> {
                 {
                     return Some(candidate);
                 }
-            }
-        }
-    }
-    // Tauri externalBin layout (target-triple suffixed) as a fallback.
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let candidate = entry.path();
-            if candidate
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|n| n.starts_with("proxybase-tunneld-"))
-                .unwrap_or(false)
-            {
-                return Some(candidate);
             }
         }
     }

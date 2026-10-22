@@ -17,17 +17,29 @@ pub async fn enable_system_tunnel(
     stop_on_gui_exit: Option<bool>,
 ) -> Result<TunnelState, String> {
     if proxy_id.trim().is_empty() {
-        return Err("proxy_id is required".into());
+        let err = "proxy_id is required".to_string();
+        #[cfg(desktop)]
+        crate::tunnel_client::emit_error("internal_error", &err).await;
+        return Err(err);
     }
     let Some((bridge_port, _upstream_addr, upstream_dial_addr)) =
         crate::bridge::bridge_info(&proxy_id).await
     else {
-        return Err(
+        let err =
             "Start the local SOCKS5 bridge for this session before enabling the system tunnel"
-                .into(),
-        );
+                .to_string();
+        #[cfg(desktop)]
+        crate::tunnel_client::emit_error("internal_error", &err).await;
+        return Err(err);
     };
-    let upstream_relay_ip = resolve_relay_ip(&upstream_dial_addr).await?;
+    let upstream_relay_ip = match resolve_relay_ip(&upstream_dial_addr).await {
+        Ok(ip) => ip,
+        Err(e) => {
+            #[cfg(desktop)]
+            crate::tunnel_client::emit_error("internal_error", &e).await;
+            return Err(e);
+        }
+    };
 
     let mut config = TunnelConfig {
         proxy_id: proxy_id.clone(),
@@ -41,7 +53,11 @@ pub async fn enable_system_tunnel(
         ..TunnelConfig::default()
     };
     config.proxy_id = proxy_id;
-    config.validate()?;
+    if let Err(e) = config.validate() {
+        #[cfg(desktop)]
+        crate::tunnel_client::emit_error("internal_error", &e).await;
+        return Err(e);
+    }
 
     #[cfg(desktop)]
     {

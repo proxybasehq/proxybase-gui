@@ -264,6 +264,7 @@ fn same_executable(expected: &std::path::Path, actual: &std::path::Path) -> bool
     }
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 fn normalize_windows_path_str(s: &str) -> String {
     let lower = s.to_ascii_lowercase();
     // std::fs::canonicalize on Windows prepends the verbatim prefix `\\?\`
