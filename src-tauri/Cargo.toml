@@ -1,6 +1,6 @@
 [package]
 name = "proxybase-gui"
-version = "0.1.99"
+version = "0.1.100"
 description = "ProxyBase desktop GUI built with Tauri"
 authors = ["ProxyBase Team"]
 edition = "2021"
@@ -36,7 +36,7 @@ futures-util = "0.3"
 hex = "0.4"
 dirs = "5"
 anyhow = "1"
-tokio = { version = "1", features = ["sync", "time", "net", "io-util", "macros"] }
+tokio = { version = "1", features = ["sync", "time", "net", "io-util", "macros", "process", "fs"] }
 tokio-util = "0.7"
 fast-socks5 = "1.0.0"
 rand = "0.8"

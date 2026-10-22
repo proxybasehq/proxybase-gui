@@ -48,8 +48,13 @@ hostname (which would resolve to a fake IP while the tunnel is active).
 
 - macOS: `osascript ... with administrator privileges` writes
   `/Library/LaunchDaemons/xyz.proxybase.tunneld.plist` and bootstraps it.
-- Linux: `pkexec proxybase-tunneld --install-systemd` writes
-  `/etc/systemd/system/proxybase-tunneld.service`.
+- Linux: `pkexec /bin/sh -c ...` streams the bundled daemon over stdin into
+  `/usr/local/lib/proxybase/proxybase-tunneld` (write to a sibling, then
+  rename, so an already-running daemon does not trigger `ETXTBSY`), then runs
+  its `--install-systemd` mode. The stream is required for AppImages: their
+  FUSE mount is only accessible to the mounting user, so root cannot exec the
+  sidecar from `/tmp/.mount_*`. The installer enables and **restarts** the
+  unit, so upgrades never leave the previous daemon running.
 - Windows: `ShellExecuteExW` with `runas` installs `ProxyBaseTunnelService`
   (LocalSystem, auto-start).
 - Android: `VpnService.prepare()` then a foreground `ProxyBaseVpnService`.

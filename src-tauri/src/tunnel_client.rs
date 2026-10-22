@@ -778,20 +778,74 @@ async fn elevate() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
-        let output = tokio::process::Command::new("pkexec")
-            .arg(&sidecar)
-            .arg("--install-systemd")
-            .arg("--allowed-uid")
-            .arg(&uid_arg)
-            .arg("--gui-path")
-            .arg(&gui_path)
-            .output()
-            .await
+        use std::process::Stdio;
+
+        // pkexec executes the installer as root. When the GUI runs from an
+        // AppImage, the daemon lives on a FUSE mount that only the mounting
+        // user can access, so root gets EACCES trying to exec it. Stream the
+        // binary over stdin into a root-owned path via trusted system tools,
+        // then exec the root-owned copy. This also avoids executing a
+        // user-writable staging file as root and works when /tmp is noexec.
+        // Write to a sibling and rename over the destination: opening a
+        // currently-running daemon binary for writing fails with ETXTBSY, but
+        // rename(2) is allowed because the running process keeps the old inode.
+        let script = format!(
+            "/bin/mkdir -p /usr/local/lib/proxybase && \
+             /bin/cat > /usr/local/lib/proxybase/proxybase-tunneld.new && \
+             /bin/chmod 0755 /usr/local/lib/proxybase/proxybase-tunneld.new && \
+             /bin/mv -f /usr/local/lib/proxybase/proxybase-tunneld.new \
+                      /usr/local/lib/proxybase/proxybase-tunneld && \
+             exec /usr/local/lib/proxybase/proxybase-tunneld \
+             --install-systemd --allowed-uid {} --gui-path {}",
+            shell_single_quote(&uid_arg),
+            shell_single_quote(&gui_path_text)
+        );
+
+        let mut child = tokio::process::Command::new("pkexec")
+            .arg("/bin/sh")
+            .arg("-c")
+            .arg(script)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| format!("failed to launch pkexec: {e}"))?;
+
+        let write_result = async {
+            let mut stdin = child
+                .stdin
+                .take()
+                .ok_or_else(|| "pkexec stdin unavailable".to_string())?;
+            let bytes = tokio::fs::read(&sidecar)
+                .await
+                .map_err(|e| format!("cannot read {}: {e}", sidecar.display()))?;
+            stdin
+                .write_all(&bytes)
+                .await
+                .map_err(|e| format!("cannot stream the daemon to the installer: {e}"))?;
+            Ok::<(), String>(())
+        }
+        .await;
+        // The block above ends with stdin dropped, sending EOF so `cat`
+        // completes. If the user dismisses the polkit prompt, pkexec may close
+        // the pipe first; prefer its stderr over the write error.
+
+        let output = child
+            .wait_with_output()
+            .await
+            .map_err(|e| format!("failed to wait for pkexec: {e}"))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("privileged install failed: {}", stderr.trim()));
+            let stderr = stderr.trim();
+            if stderr.is_empty() {
+                return Err(format!(
+                    "privileged install failed (exit status {})",
+                    output.status
+                ));
+            }
+            return Err(format!("privileged install failed: {stderr}"));
         }
+        write_result?;
         return Ok(());
     }
 
@@ -811,7 +865,7 @@ async fn elevate() -> Result<(), String> {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 fn shell_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }

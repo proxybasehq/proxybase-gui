@@ -137,7 +137,10 @@ fn install_linux(binary: &Path, allowed_uid: u32) -> anyhow::Result<()> {
     );
     std::fs::write(UNIT_PATH, unit)?;
     run("systemctl", &["daemon-reload"])?;
-    run("systemctl", &["enable", "--now", SERVICE_NAME])?;
+    run("systemctl", &["enable", SERVICE_NAME])?;
+    // `enable --now` is a no-op for an already-running unit, which would keep
+    // the previous daemon (and its old route/DNS code) alive after an upgrade.
+    run("systemctl", &["restart", SERVICE_NAME])?;
     Ok(())
 }
 
