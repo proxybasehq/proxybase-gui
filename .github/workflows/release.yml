@@ -19,6 +19,10 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          # Native arm64 runner (free for public repos). AppImage/deb/rpm for
+          # aarch64 cannot be cross-compiled reliably; this runner also builds
+          # the aarch64 proxybase-tunneld sidecar natively.
+          - ubuntu-24.04-arm
           - windows-latest
           - macos-14
 
@@ -51,7 +55,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libsoup-3.0-dev
+            libsoup-3.0-dev \
+            rpm
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -322,12 +327,18 @@ jobs:
 
           # Build platform entries from the signature files (one per updater
           # artifact). Keys match tauri-plugin-updater's target strings:
-          # linux-x86_64, windows-x86_64, darwin-x86_64, darwin-aarch64.
+          # linux-x86_64, linux-aarch64, windows-x86_64, darwin-x86_64,
+          # darwin-aarch64.
           echo "Mapping updater artifacts:"
           for sig in $(find dist -type f -name '*.sig' | sort); do
             artifact="${sig%.sig}"
             base="$(basename "$artifact")"
             case "$base" in
+              # Tauri names Linux AppImages by architecture: *_amd64.AppImage
+              # and *_aarch64.AppImage. Match arm64 first so it is not
+              # overwritten by the generic AppImage entry below.
+              *_aarch64.AppImage|*_arm64.AppImage)
+                add_platform "linux-aarch64" "$artifact" "$sig" ;;
               *.AppImage)
                 add_platform "linux-x86_64" "$artifact" "$sig" ;;
               *.msi|*x64-setup.exe|*-setup.exe)

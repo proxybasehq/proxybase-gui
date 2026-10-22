@@ -72,10 +72,13 @@ export default function SystemTunnelBanner({ onTopUp }: { onTopUp?: () => void }
 
   const connected = state.status === "connected";
   const errored = state.status === "error";
+  const vpnConflict = errored && state.code === "conflicting_vpn";
   const statusText = connected
     ? t("tunnel.connected")
     : errored
-      ? t("tunnel.error")
+      ? vpnConflict
+        ? t("tunnel.vpnConflict")
+        : t("tunnel.error")
       : state.status === "reconnecting"
         ? t("tunnel.reconnecting")
         : state.status === "disconnecting"

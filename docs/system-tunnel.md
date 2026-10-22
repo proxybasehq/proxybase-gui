@@ -106,6 +106,29 @@ Windows manager keeps these invariants; do not relax them:
 - Restores delete only `MIB_IPPROTO_NETMGMT` routes, so DHCP/connected routes
   that existed before the tunnel survive a disconnect.
 
+## Conflicting VPNs
+
+A second **full-tunnel** VPN cannot coexist with the system tunnel: both want
+the default route, and whichever loses silently breaks the tunnel or leaks
+traffic. Before creating the TUN device, the daemon asks the platform manager
+for a conflicting VPN and refuses to start with `conflicting_vpn`, naming the
+interface (e.g. `utun4`).
+
+Detection rules (implemented per platform in `tunnel/platform/*.rs`):
+
+- macOS: up `utun*`/`ipsec*`/`ppp*` interfaces that own the IPv4 default route
+  or one of its `/1` halves. IPv6-only defaults from Apple's built-in
+  `utun0`-`utun3` system interfaces are ignored.
+- Linux: up `tun*`/`tap*`/`wg*`/`ppp*`/`tailscale*`/`nordlynx`/... interfaces
+  that own an IPv4 `default`, `0.0.0.0/1`, or `128.0.0.0/1` route in the main
+  table.
+- Windows: up `IF_TYPE_TUNNEL`/`IF_TYPE_PPP` or VPN-named adapters (WireGuard,
+  Wintun, TAP-Windows, OpenVPN, Tailscale, NordLynx, Proton, Mullvad, WARP)
+  that own an IPv4 default or `/1` route. ProxyBase's own adapter is excluded.
+
+Split-tunnel VPNs (Tailscale without an exit node, corporate routes) leave the
+default route alone and are not reported; they can run alongside the tunnel.
+
 ## Crash recovery
 
 Every route/DNS mutation is preceded by an atomic journal write

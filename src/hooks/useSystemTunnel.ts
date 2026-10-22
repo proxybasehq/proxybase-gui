@@ -191,8 +191,14 @@ export function useSystemTunnel() {
       const message = String(e);
       console.error("[tunnel] enableSystemTunnel failed:", message);
       setGlobalError(message);
-      // If the backend did not already emit a structured error, synthesize one
-      // so the user sees the error banner.
+      // The daemon usually emits a structured error event (e.g.
+      // `conflicting_vpn`) just before the invoke rejects. Preserve that code
+      // so the banner can show the specific title; only synthesize a generic
+      // error when no matching event arrived.
+      const existing = globalState;
+      if (existing.status === "error" && existing.message === message) {
+        return null;
+      }
       setGlobalState({
         status: "error",
         code: "internal_error",

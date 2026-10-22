@@ -347,6 +347,7 @@ const en = {
   "tunnel.connecting": "Connecting...",
   "tunnel.connected": "System Tunnel Active",
   "tunnel.error": "System Tunnel Error",
+  "tunnel.vpnConflict": "Another VPN Is Active",
   "tunnel.reconnecting": "Tunnel Reconnecting...",
   "tunnel.disconnecting": "Disconnecting...",
   "tunnel.pleaseWait": "Please wait...",

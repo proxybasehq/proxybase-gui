@@ -27,8 +27,10 @@ pnpm tauri:build
 
 This repository includes GitHub workflows for:
 
-- Cross-platform CI builds on Linux, Windows, macOS Intel, and macOS Apple Silicon
+- Cross-platform CI builds on Linux x86_64/arm64, Windows, macOS Intel, and
+  macOS Apple Silicon
 - Tagged production release builds and artifact publishing to GitHub Releases
+  (Linux arm64 `.deb`/`.rpm`/`.AppImage` + updater manifest entries)
 
 Release tag format:
 
