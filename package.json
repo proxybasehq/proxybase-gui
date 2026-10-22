@@ -1,7 +1,7 @@
 {
   "name": "proxybase-gui",
   "private": true,
-  "version": "0.1.95",
+  "version": "0.1.96",
   "type": "module",
   "engines": {
     "node": ">=22",
