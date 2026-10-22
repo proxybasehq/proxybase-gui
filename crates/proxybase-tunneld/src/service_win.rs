@@ -129,8 +129,21 @@ fn same_file(a: &std::path::Path, b: &std::path::Path) -> bool {
 }
 
 fn replace_file(tmp: &std::path::Path, dest: &std::path::Path) -> anyhow::Result<()> {
-    // The previous service may still be releasing the executable/DLL for a
-    // moment after reaching the Stopped state.
+    if dest.exists() {
+        // On Windows, an open/mapped executable cannot be overwritten directly,
+        // but Windows permits renaming an open executable to an ".old" name on
+        // the same volume. Renaming frees the destination path immediately.
+        let old = dest.with_file_name(format!(
+            "proxybase-tunneld.exe.old.{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        ));
+        let _ = std::fs::rename(dest, &old);
+        let _ = std::fs::remove_file(&old);
+    }
+
     let mut last_error = None;
     for _ in 0..25 {
         match std::fs::rename(tmp, dest) {
@@ -141,6 +154,12 @@ fn replace_file(tmp: &std::path::Path, dest: &std::path::Path) -> anyhow::Result
             }
         }
     }
+
+    if std::fs::copy(tmp, dest).is_ok() {
+        let _ = std::fs::remove_file(tmp);
+        return Ok(());
+    }
+
     Err(anyhow::anyhow!(
         "could not replace {}: {:?}",
         dest.display(),
@@ -274,6 +293,56 @@ fn terminate_process(pid: u32) {
     }
 }
 
+fn kill_stale_daemon_processes() {
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+
+    let my_pid = std::process::id();
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot.is_null() || snapshot == INVALID_HANDLE_VALUE {
+        return;
+    }
+
+    let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() };
+    entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+
+    if unsafe { Process32FirstW(snapshot, &mut entry) } != 0 {
+        loop {
+            if entry.th32ProcessID != my_pid {
+                let len = entry
+                    .szExeFile
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                let name = String::from_utf16_lossy(&entry.szExeFile[..len]).to_ascii_lowercase();
+                if name == "proxybase-tunneld.exe" {
+                    terminate_process(entry.th32ProcessID);
+                }
+            }
+            if unsafe { Process32NextW(snapshot, &mut entry) } == 0 {
+                break;
+            }
+        }
+    }
+    unsafe { CloseHandle(snapshot) };
+}
+
+fn cleanup_stale_binaries(dir: &std::path::Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            if name.starts_with("proxybase-tunneld.exe.old")
+                || name.starts_with("proxybase-tunneld.exe.new")
+            {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+}
+
 pub fn install(allowed_uid: Option<u32>, gui_path: Option<&std::path::Path>) -> anyhow::Result<()> {
     // The interactive-user DACL makes a per-uid check unnecessary, but the
     // installer still records it for consistency with Unix builds.
@@ -299,6 +368,9 @@ pub fn install(allowed_uid: Option<u32>, gui_path: Option<&std::path::Path>) -> 
         let _ = existing.delete();
         drop(existing);
     }
+
+    kill_stale_daemon_processes();
+    cleanup_stale_binaries(&install_dir());
 
     let binary = copy_binary()?;
     if let Some(gui) = gui_path {

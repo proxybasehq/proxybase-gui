@@ -1,6 +1,6 @@
 [package]
 name = "proxybase-tunneld"
-version = "0.1.93"
+version = "0.1.94"
 edition = "2021"
 description = "Privileged system-wide tunnel daemon for ProxyBase"
 license = "MIT"
@@ -36,5 +36,6 @@ windows-sys = { version = "0.60", features = [
     "Win32_System_Pipes",
     "Win32_Storage_FileSystem",
     "Win32_System_IO",
+    "Win32_System_Diagnostics_ToolHelp",
 ] }
 windows-service = "0.7"
