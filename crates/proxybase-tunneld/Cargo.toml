@@ -1,6 +1,6 @@
 [package]
 name = "proxybase-tunneld"
-version = "0.1.92"
+version = "0.1.93"
 edition = "2021"
 description = "Privileged system-wide tunnel daemon for ProxyBase"
 license = "MIT"
