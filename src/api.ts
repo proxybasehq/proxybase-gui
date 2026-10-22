@@ -289,6 +289,11 @@ export async function getSystemTunnelStatus(): Promise<TunnelState> {
   return invoke("get_system_tunnel_status");
 }
 
+/** Daemon log tail + environment details, for support and bug reports. */
+export async function getTunnelDiagnostics(): Promise<string> {
+  return invoke("get_tunnel_diagnostics");
+}
+
 export async function getTunnelTelemetry(): Promise<TunnelTelemetry> {
   return invoke("get_tunnel_telemetry");
 }

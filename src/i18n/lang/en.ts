@@ -373,6 +373,12 @@ const en = {
   "tunnel.bypassDesc":
     "One CIDR per line. Private LAN ranges are always excluded automatically.",
   "tunnel.appliesNext": "Changes apply the next time the tunnel connects.",
+  "tunnel.diagnostics": "Diagnostics",
+  "tunnel.diagnosticsTitle": "Tunnel Diagnostics",
+  "tunnel.diagnosticsDesc":
+    "Daemon log tail and environment details. Paste this when reporting a tunnel problem.",
+  "tunnel.diagnosticsCopy": "Copy to clipboard",
+  "tunnel.diagnosticsCopied": "Copied",
 
 };
 

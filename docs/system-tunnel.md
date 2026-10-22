@@ -71,9 +71,40 @@ copy the DLL manually.
 - `%ProgramData%\ProxyBase\last_install_error.txt` — written by the elevated
   installer when registration/startup fails; the GUI includes it in the
   elevation error and removes it after a successful install.
+- The tunnel error banner has a **Diagnostics** button that returns the tail of
+  the daemon log, the current tunnel state, and the last install error. Ask
+  users for that output when reporting a Windows problem.
 - The GUI waits up to 15 s for the named pipe after elevation. The installer
   itself stops and deletes any previous `ProxyBaseTunnelService` before
   replacing the binary, then waits for the SCM to report `Running`.
+- The Windows service keeps running when the GUI is updated, so a warm IPC
+  connection can point at an older daemon. On every enable, the GUI verifies
+  both the daemon version and the installed binary hash against the bundled
+  sidecar and re-runs the elevated installer when they differ.
+
+### Windows route rules (error 87)
+
+`CreateIpForwardEntry2` is much stricter than `route(8)` on macOS/Linux. The
+Windows manager keeps these invariants; do not relax them:
+
+- Destination prefixes are always canonical network addresses. Windows rejects
+  a row like `10.255.0.2/30` (host bits set) with
+  `ERROR_INVALID_PARAMETER` (87); it must be `10.255.0.0/30`.
+- `SitePrefixLength` must be `0` — `InitializeIpForwardEntry` leaves it at 255,
+  which is greater than most prefix lengths and therefore rejected.
+- Next hop and destination families must match. An IPv6 relay can never be
+  pinned through the IPv4 default gateway.
+- The relay host route is derived from `GetBestRoute2`, so its interface and
+  next hop are exactly what Windows itself would use (multi-homed hosts, VPNs,
+  IPv6 relays). Do not assume the default gateway.
+- `InitializeIpForwardEntry` also leaves `Metric`/`Protocol` at illegal values
+  and sets `Loopback`, `AutoconfigureAddress`, and `Publish` to TRUE; the row
+  builder fills every field explicitly.
+- A fresh Wintun adapter can transiently reject routes with 87/1168 before the
+  IP Helper provider publishes it; route creation waits for the interface and
+  retries briefly.
+- Restores delete only `MIB_IPPROTO_NETMGMT` routes, so DHCP/connected routes
+  that existed before the tunnel survive a disconnect.
 
 ## Crash recovery
 

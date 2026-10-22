@@ -371,6 +371,7 @@ pub fn run() {
             tunnel_commands::disable_system_tunnel,
             tunnel_commands::get_system_tunnel_status,
             tunnel_commands::get_tunnel_telemetry,
+            tunnel_commands::get_tunnel_diagnostics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

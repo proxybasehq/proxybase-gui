@@ -151,6 +151,81 @@ pub async fn get_tunnel_telemetry() -> Result<TunnelTelemetry, String> {
     }
 }
 
+/// Collect the daemon log tail plus environment details for support.
+///
+/// The privileged daemon's log is the only place Windows route/DNS failures
+/// are recorded (a LocalSystem service has no console), so surface it in the
+/// GUI's error banner instead of making users hunt through ProgramData.
+#[tauri::command]
+pub async fn get_tunnel_diagnostics() -> Result<String, String> {
+    let state = get_system_tunnel_status()
+        .await
+        .unwrap_or(TunnelState::Disconnected);
+    let mut out = format!(
+        "ProxyBase {}\nOS: {} {}\n\nTunnel state:\n{}\n\n",
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        serde_json::to_string_pretty(&state).unwrap_or_else(|_| format!("{state:?}"))
+    );
+    out.push_str(&daemon_log_tail());
+    Ok(out)
+}
+
+fn daemon_log_tail() -> String {
+    const MAX_LINES: usize = 400;
+    let mut out = String::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::path::PathBuf;
+        let base = std::env::var_os("ProgramData")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"))
+            .join("ProxyBase");
+        let log = base.join("tunneld.log");
+        out.push_str(&format!("Log file: {}\n", log.display()));
+        out.push_str(
+            &tail_file(&log, MAX_LINES).unwrap_or_else(|e| format!("<unavailable: {e}>\n")),
+        );
+        let install_error = base.join("last_install_error.txt");
+        if let Ok(text) = std::fs::read_to_string(&install_error) {
+            if !text.trim().is_empty() {
+                out.push_str(&format!("\nLast install error:\n{}\n", text.trim()));
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let log = std::path::PathBuf::from("/var/log/proxybase-tunneld.log");
+        out.push_str(&format!("Log file: {}\n", log.display()));
+        out.push_str(
+            &tail_file(&log, MAX_LINES).unwrap_or_else(|e| format!("<unavailable: {e}>\n")),
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        out.push_str(
+            "The tunnel daemon logs to the systemd journal. Run:\n  \
+             journalctl -u proxybase-tunneld -n 400 --no-pager\n",
+        );
+    }
+
+    out
+}
+
+fn tail_file(path: &std::path::Path, max_lines: usize) -> std::io::Result<String> {
+    const MAX_BYTES: usize = 512 * 1024;
+    let bytes = std::fs::read(path)?;
+    let start = bytes.len().saturating_sub(MAX_BYTES);
+    let text = String::from_utf8_lossy(&bytes[start..]);
+    let lines: Vec<&str> = text.lines().collect();
+    let start = lines.len().saturating_sub(max_lines);
+    Ok(lines[start..].join("\n"))
+}
+
 /// Resolve the upstream relay hostname once, in the unprivileged GUI process,
 /// before any routes change. The daemon receives only a validated `IpAddr`.
 async fn resolve_relay_ip(upstream: &str) -> Result<IpAddr, String> {

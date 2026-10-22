@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CountryFlag } from "../CountryFlag";
+import { getTunnelDiagnostics } from "../../api";
 import { isTunnelActive, useSystemTunnel } from "../../hooks/useSystemTunnel";
 import { useI18n } from "../../i18n";
 import TunnelSettingsModal from "./TunnelSettingsModal";
@@ -33,7 +34,33 @@ export default function SystemTunnelBanner({ onTopUp }: { onTopUp?: () => void }
   const { t } = useI18n();
   const { state, telemetry, disable, dismissError, busy } = useSystemTunnel();
   const [showSettings, setShowSettings] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<string | null>(null);
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+  const [diagnosticsCopied, setDiagnosticsCopied] = useState(false);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+
+  async function openDiagnostics() {
+    setDiagnosticsOpen(true);
+    setDiagnostics(null);
+    setDiagnosticsError(null);
+    setDiagnosticsCopied(false);
+    try {
+      setDiagnostics(await getTunnelDiagnostics());
+    } catch (e) {
+      setDiagnosticsError(String(e));
+    }
+  }
+
+  async function copyDiagnostics() {
+    if (!diagnostics) return;
+    try {
+      await navigator.clipboard.writeText(diagnostics);
+      setDiagnosticsCopied(true);
+    } catch {
+      // Clipboard may be unavailable; the text remains selectable.
+    }
+  }
 
   useEffect(() => {
     if (state.status !== "connected") return;
@@ -93,6 +120,16 @@ export default function SystemTunnelBanner({ onTopUp }: { onTopUp?: () => void }
                 {t("tunnel.settings")}
               </button>
             )}
+            {errored && (
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ padding: "0 10px", height: 26, fontSize: 11 }}
+                onClick={() => void openDiagnostics()}
+                title={t("tunnel.diagnosticsDesc")}
+              >
+                {t("tunnel.diagnostics")}
+              </button>
+            )}
             <button
               className="btn btn-danger btn-sm"
               style={{ padding: "0 10px", height: 26, fontSize: 11 }}
@@ -133,6 +170,82 @@ export default function SystemTunnelBanner({ onTopUp }: { onTopUp?: () => void }
         )}
       </div>
       <TunnelSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
+
+      {diagnosticsOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+          }}
+          onClick={() => setDiagnosticsOpen(false)}
+        >
+          <div
+            className="modal-card"
+            style={{
+              width: "min(640px, 94vw)",
+              maxHeight: "86vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="card-title">{t("tunnel.diagnosticsTitle")}</div>
+            <p className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>
+              {t("tunnel.diagnosticsDesc")}
+            </p>
+            {diagnosticsError ? (
+              <p style={{ fontSize: 12, color: "var(--color-danger, #dc2626)" }}>
+                {diagnosticsError}
+              </p>
+            ) : diagnostics === null ? (
+              <p className="text-muted" style={{ fontSize: 12 }}>
+                {t("tunnel.pleaseWait")}
+              </p>
+            ) : (
+              <textarea
+                readOnly
+                value={diagnostics}
+                rows={18}
+                onFocus={(e) => e.currentTarget.select()}
+                style={{
+                  width: "100%",
+                  flex: 1,
+                  minHeight: 240,
+                  fontFamily: "JetBrains Mono, monospace",
+                  fontSize: 11,
+                  padding: 8,
+                  borderRadius: 6,
+                  border: "1px solid var(--color-border, #e5e5e5)",
+                  resize: "vertical",
+                  whiteSpace: "pre",
+                }}
+              />
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button
+                className="btn btn-secondary"
+                style={{ flex: 1 }}
+                disabled={!diagnostics}
+                onClick={() => void copyDiagnostics()}
+              >
+                {diagnosticsCopied ? t("tunnel.diagnosticsCopied") : t("tunnel.diagnosticsCopy")}
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={() => setDiagnosticsOpen(false)}
+              >
+                {t("common.close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

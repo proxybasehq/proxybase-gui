@@ -183,11 +183,23 @@ impl ClientState {
 
     async fn ensure_connected(&self, allow_elevation: bool) -> Result<(), String> {
         if self.writer.lock().await.is_some() {
-            return Ok(());
+            if !allow_elevation {
+                return Ok(());
+            }
+            // A warm connection is not proof the daemon is current: the
+            // Windows service keeps running across GUI updates, so the
+            // connected process can be an older build. Verify it before using
+            // it, otherwise route/DNS fixes never reach the service.
+            let ping_res = self.send_ping(Duration::from_millis(2000)).await;
+            return self.handle_ping_result(ping_res, allow_elevation).await;
         }
         let _guard = self.connecting.lock().await;
         if self.writer.lock().await.is_some() {
-            return Ok(());
+            if !allow_elevation {
+                return Ok(());
+            }
+            let ping_res = self.send_ping(Duration::from_millis(2000)).await;
+            return self.handle_ping_result(ping_res, allow_elevation).await;
         }
         match open_stream().await {
             Ok((reader, writer)) => {
@@ -195,33 +207,45 @@ impl ClientState {
                 // Verify the connection with a fast ping. If ping fails or version differs,
                 // the daemon is stale, crashed, or unauthorized.
                 let ping_res = self.send_ping(Duration::from_millis(2000)).await;
-                match ping_res {
-                    Ok(version) => {
-                        let app_version = env!("CARGO_PKG_VERSION");
-                        if version != app_version && allow_elevation {
-                            eprintln!(
-                                "[tunnel] upgrading tunneld: running {version}, expected {app_version}"
-                            );
-                            self.reset().await;
-                            return self.elevate_and_poll().await;
-                        }
-                        Ok(())
-                    }
-                    Err(e) if allow_elevation => {
-                        eprintln!(
-                            "[tunnel] daemon ping failed ({e}); reinstalling service via elevation"
-                        );
-                        self.reset().await;
-                        self.elevate_and_poll().await
-                    }
-                    Err(e) => {
-                        self.reset().await;
-                        Err(format!("cannot reach proxybase-tunneld: {e}"))
-                    }
-                }
+                self.handle_ping_result(ping_res, allow_elevation).await
             }
             Err(e) if allow_elevation && daemon_absent(&e) => self.elevate_and_poll().await,
             Err(e) => Err(format!("cannot reach proxybase-tunneld: {e}")),
+        }
+    }
+
+    async fn handle_ping_result(
+        &self,
+        ping_res: Result<String, String>,
+        allow_elevation: bool,
+    ) -> Result<(), String> {
+        match ping_res {
+            Ok(version) => {
+                let app_version = env!("CARGO_PKG_VERSION");
+                // Version equality is not enough: development builds and
+                // rebuilt sidecars keep the same version. Compare the
+                // installed service binary with the bundled sidecar so a
+                // stale daemon cannot keep running old route/DNS code after
+                // an app update.
+                if allow_elevation && (version != app_version || daemon_binary_is_stale()) {
+                    eprintln!(
+                        "[tunnel] upgrading tunneld: running {version}, expected {app_version}"
+                    );
+                    self.reset().await;
+                    self.elevate_and_poll().await
+                } else {
+                    Ok(())
+                }
+            }
+            Err(e) if allow_elevation => {
+                eprintln!("[tunnel] daemon ping failed ({e}); reinstalling service via elevation");
+                self.reset().await;
+                self.elevate_and_poll().await
+            }
+            Err(e) => {
+                self.reset().await;
+                Err(format!("cannot reach proxybase-tunneld: {e}"))
+            }
         }
     }
 
@@ -554,6 +578,64 @@ pub async fn cached_telemetry() -> TelemetryView {
 // ---------------------------------------------------------------------------
 // Privilege bootstrap
 // ---------------------------------------------------------------------------
+
+/// True when the running service is a different binary than the one bundled
+/// with this GUI (same version, rebuilt locally or via an app update).
+///
+/// Version equality alone is not enough: a dev build or a hot-fixed sidecar
+/// keeps the same version string, and leaving the old daemon running would
+/// silently keep old route/DNS code.
+fn daemon_binary_is_stale() -> bool {
+    let Some(bundled) = sidecar_path() else {
+        return false;
+    };
+
+    #[cfg(target_os = "windows")]
+    let installed = std::env::var_os("ProgramFiles")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from(r"C:\Program Files"))
+        .join("ProxyBase")
+        .join("tunneld")
+        .join("proxybase-tunneld.exe");
+    #[cfg(target_os = "macos")]
+    let installed =
+        std::path::PathBuf::from("/Library/Application Support/ProxyBase/proxybase-tunneld");
+    #[cfg(target_os = "linux")]
+    let installed = std::path::PathBuf::from("/usr/local/lib/proxybase/proxybase-tunneld");
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    let installed = std::path::PathBuf::new();
+
+    binary_differs(&bundled, &installed)
+}
+
+fn binary_differs(bundled: &std::path::Path, installed: &std::path::Path) -> bool {
+    use std::hash::{Hash, Hasher};
+
+    let Ok(bundled_meta) = std::fs::metadata(bundled) else {
+        // No bundled sidecar to install; leave the running service alone.
+        return false;
+    };
+    if !installed.exists() {
+        // Bundled sidecar exists but nothing is installed yet.
+        return true;
+    }
+    let Ok(installed_meta) = std::fs::metadata(installed) else {
+        return false;
+    };
+    if bundled_meta.len() != installed_meta.len() {
+        return true;
+    }
+    let hash = |path: &std::path::Path| -> Option<u64> {
+        let bytes = std::fs::read(path).ok()?;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        bytes.hash(&mut hasher);
+        Some(hasher.finish())
+    };
+    match (hash(bundled), hash(installed)) {
+        (Some(bundled), Some(installed)) => bundled != installed,
+        _ => false,
+    }
+}
 
 fn sidecar_path() -> Option<std::path::PathBuf> {
     if let Some(path) = std::env::var_os("PROXYBASE_TUNNELD_PATH") {
