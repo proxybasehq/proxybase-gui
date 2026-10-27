@@ -5,6 +5,16 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
+# JNI entry points. These classes and methods are looked up by name from
+# Rust (src-tauri/src/android_vpn_jni.rs), so R8 cannot see any callers and
+# would strip or rename them in release builds:
+#   - VpnController.startVpn / stopVpn      -> NoSuchMethodError at tap time
+#   - ProxyBaseVpnService.protectSocketFromRust -> relay sockets not protected
+# Native methods themselves must also keep their exact names so the
+# Java_xyz_proxybase_desktop_* symbols in libproxybase_gui_lib.so resolve.
+-keep class xyz.proxybase.desktop.VpnController { *; }
+-keep class xyz.proxybase.desktop.ProxyBaseVpnService { *; }
+
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:

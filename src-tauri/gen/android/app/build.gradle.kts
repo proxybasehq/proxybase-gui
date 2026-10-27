@@ -13,6 +13,18 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Local release signing. `keystore.properties` is gitignored and only exists
+// on developer machines. CI does not create it, so the release APK stays
+// unsigned there and the workflow signs it with apksigner afterwards.
+// Without this, `tauri android run --release` installs an unsigned APK and
+// adb fails with INSTALL_PARSE_FAILED_NO_CERTIFICATES.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     compileSdk = 36
     namespace = "xyz.proxybase.desktop"
@@ -23,6 +35,16 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -37,6 +59,8 @@ android {
             }
         }
         getByName("release") {
+            // null when keystore.properties is absent (CI): keep the APK unsigned.
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }

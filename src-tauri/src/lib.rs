@@ -44,6 +44,12 @@ pub fn app_handle() -> &'static tauri::AppHandle {
     APP_HANDLE.get().expect("APP_HANDLE not initialised")
 }
 
+/// Non-panicking variant for paths that can run before Tauri's setup, e.g. a
+/// VpnService restarted by Android in a fresh process after a crash.
+pub fn app_handle_opt() -> Option<&'static tauri::AppHandle> {
+    APP_HANDLE.get()
+}
+
 /// Ensure the OnceLock is set (first call wins). Returns the resolved path.
 pub fn ensure_proxybase_dir(app_handle: &tauri::AppHandle) -> PathBuf {
     let dir = app_handle

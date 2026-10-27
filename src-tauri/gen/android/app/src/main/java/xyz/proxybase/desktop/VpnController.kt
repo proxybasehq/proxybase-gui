@@ -29,8 +29,19 @@ object VpnController {
     @JvmStatic
     external fun nativePermissionResult(granted: Boolean)
 
+    @JvmStatic
+    external fun nativeAttach(context: Context)
+
     fun attach(activity: Activity) {
         activityRef = WeakReference(activity)
+        // Capture the JVM and application Context for Rust JNI calls made from
+        // tokio worker threads. Tauri does not initialise ndk_context, so Rust
+        // cannot look them up on its own.
+        try {
+            nativeAttach(activity.applicationContext ?: activity)
+        } catch (_: Throwable) {
+            // Native library unavailable; tunnel start will report the error.
+        }
     }
 
     @JvmStatic
@@ -45,7 +56,15 @@ object VpnController {
             return startService(context, configJson)
         }
         return try {
-            activity.startActivityForResult(prepareIntent, REQUEST_CODE)
+            // startVpn is called from a Rust tokio worker; the consent dialog
+            // must be launched on the UI thread.
+            activity.runOnUiThread {
+                try {
+                    activity.startActivityForResult(prepareIntent, REQUEST_CODE)
+                } catch (_: Exception) {
+                    nativePermissionResult(false)
+                }
+            }
             true
         } catch (_: Exception) {
             nativePermissionResult(false)

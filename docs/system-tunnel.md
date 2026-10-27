@@ -28,6 +28,27 @@ The relay host is resolved to an IP *before* the tunnel starts and pinned with
 a `/32` route via the physical gateway; the GUI bridge dials that IP, never the
 hostname (which would resolve to a fake IP while the tunnel is active).
 
+## Android runtime invariant
+
+`VpnService` lifecycle callbacks (`nativeStartTunEngine`) run on Android's main
+thread, which is **not** a tokio worker. `tun_rs::AsyncDevice::from_fd`
+registers the descriptor with tokio's reactor via `AsyncFd::register`, which
+calls `Handle::current()` and panics ("no reactor running") when no runtime is
+entered. The release profile sets `panic = "abort"`, so such a panic kills the
+process instantly — with no ANR and no dialog, the app just closes. The fd must
+be adopted inside `tauri::async_runtime::spawn`, and the failure path must stop
+the VpnService so the OS does not show an active VPN over a dead TUN. The same
+rule applies to any future JNI entry point that creates tokio IO resources.
+
+Tauri's Android glue also **does not initialise `ndk_context`** (that is an
+ndk-glue/tao convention). Calling `ndk_context::android_context()` from a JNI
+path therefore panics, and because the call happens inside a Tauri command
+future, the JS `await` never settles — the tunnel toggle spins forever instead
+of showing an error. `VpnController.attach()` calls the `nativeAttach` JNI
+export on the main thread, which caches the `JavaVM`, the application
+`Context`, and the `VpnController` class for later calls from tokio workers.
+Do not reintroduce `ndk_context` lookups here.
+
 The TUN subnet is installed as its canonical network address
 (`10.255.0.0/30`, not the interface address `10.255.0.2/30`). Linux `ip route`
 rejects prefixes with host bits ("Invalid prefix for given prefix length");
